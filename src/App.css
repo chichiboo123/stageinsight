@@ -1,0 +1,8 @@
+/* App.css - 전역 앱 레이아웃 스타일 */
+/* 대부분의 스타일은 index.css (CSS Variables)와 각 모듈 CSS에서 처리 */
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}

@@ -1,0 +1,306 @@
+.page {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-16);
+}
+
+.breadcrumb {
+  margin-bottom: var(--space-4);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+/* 공연 목록 사이드 */
+.performanceList {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.perfCards {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.perfCard {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  border: 2px solid transparent;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.perfCardActive {
+  border-color: var(--color-accent-primary) !important;
+}
+
+.perfPoster {
+  width: 60px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.perfInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.perfTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perfDate {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.stateTag[data-state="공연중"] {
+  background: #dcfce7;
+  color: #15803d;
+}
+.stateTag[data-state="공연예정"] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* 대시보드 메인 */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* 공연 상세 카드 */
+.perfDetail {
+  display: flex;
+  gap: var(--space-6);
+  padding: var(--space-6);
+}
+
+.detailPoster {
+  width: 140px;
+  height: 190px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.detailInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.detailTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.detailTitle {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.detailVenue {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.detailSynopsis {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.detailPrice {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* 섹션 공통 */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.filterBtns {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.emptyText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* 성취기준 그리드 */
+.standardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.standardCard {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.standardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.score {
+  font-size: var(--font-size-xs);
+  color: var(--color-accent-primary);
+  font-weight: var(--font-weight-semibold);
+  margin-left: auto;
+}
+
+.standardId {
+  font-size: var(--font-size-sm);
+  font-family: monospace;
+  color: var(--color-accent-dark);
+  background: var(--color-tag-bg);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  align-self: flex-start;
+}
+
+.standardContent {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.matchedKws {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.kwTag {
+  background: var(--color-accent-light);
+  color: var(--color-accent-dark);
+}
+
+/* 미디어 카드 */
+.mediaCard {
+  min-width: 160px;
+  max-width: 160px;
+  flex-shrink: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mediaPoster {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.mediaPosterSkeleton {
+  width: 100%;
+  height: 200px;
+}
+
+.mediaInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mediaTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mediaYear {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mediaRating {
+  font-size: var(--font-size-xs);
+  color: var(--color-accent-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mediaTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .performanceList {
+    position: static;
+    max-height: none;
+  }
+  .perfCards {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+  }
+  .perfCard {
+    min-width: 200px;
+  }
+}

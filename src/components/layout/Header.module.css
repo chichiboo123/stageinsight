@@ -1,0 +1,105 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--color-bg-overlay);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-slow);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+/* 로고 */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: default;
+  user-select: none;
+}
+
+.logoIcon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.logoText {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+/* 우측 컨트롤 */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* 테마 선택 버튼 그룹 */
+.themeSelector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-2);
+}
+
+.themeBtn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--theme-color);
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.themeBtn:hover {
+  transform: scale(1.2);
+}
+
+.themeBtnActive {
+  border-color: var(--color-text-primary);
+  transform: scale(1.15);
+}
+
+/* 인사이트 버튼 */
+.insightBtn {
+  position: relative;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-on-accent);
+  color: var(--color-accent-primary);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .logoText {
+    font-size: var(--font-size-base);
+  }
+  .insightBtn span:not(.badge) {
+    display: none;
+  }
+}

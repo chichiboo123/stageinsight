@@ -1,0 +1,179 @@
+/**
+ * 카카오 API 서비스
+ * - 키워드 검색으로 학교 좌표 획득 (카카오 로컬 API)
+ * - 특정 좌표 반경 내 공연장 검색
+ * - 두 지점 간 경로/소요시간 조회 (카카오 모빌리티 API)
+ *
+ * 환경 변수 설정 필요:
+ *   VITE_KAKAO_REST_API_KEY=your_rest_api_key
+ *   VITE_KAKAO_JS_API_KEY=your_js_api_key (지도 렌더링용)
+ */
+
+import type { School, Venue } from '../types';
+
+const BASE_URL = 'https://dapi.kakao.com/v2/local';
+const MOBILITY_URL = 'https://apis-navi.kakaomobility.com/v1';
+const API_KEY = import.meta.env.VITE_KAKAO_REST_API_KEY as string;
+
+// 인증 헤더
+const authHeader = () => ({ Authorization: `KakaoAK ${API_KEY}` });
+
+// ---------- 타입 ----------
+interface KakaoDocument {
+  id: string;
+  place_name: string;
+  address_name: string;
+  road_address_name: string;
+  x: string;  // lng
+  y: string;  // lat
+  phone: string;
+  category_group_code: string;
+}
+
+interface KakaoSearchResponse {
+  documents: KakaoDocument[];
+  meta: {
+    total_count: number;
+    pageable_count: number;
+    is_end: boolean;
+  };
+}
+
+interface KakaoRouteResponse {
+  routes: Array<{
+    result_code: number;
+    summary: {
+      duration: number;  // 초
+      distance: number;  // 미터
+    };
+  }>;
+}
+
+// ---------- 학교 검색 ----------
+export async function searchSchools(query: string): Promise<School[]> {
+  if (!query.trim()) return [];
+
+  const params = new URLSearchParams({
+    query,
+    category_group_code: 'SC4', // 학교
+    size: '10',
+  });
+
+  const res = await fetch(`${BASE_URL}/search/keyword.json?${params}`, {
+    headers: authHeader(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`카카오 학교 검색 실패: ${err?.message ?? res.statusText}`);
+  }
+
+  const data: KakaoSearchResponse = await res.json();
+  return data.documents.map(doc => ({
+    id: doc.id,
+    name: doc.place_name,
+    address: doc.road_address_name || doc.address_name,
+    lat: parseFloat(doc.y),
+    lng: parseFloat(doc.x),
+  }));
+}
+
+// ---------- 반경 내 공연장 검색 ----------
+// KOPIS 연계 전 카카오로 1차 필터: category_group_code CT1 (문화시설)
+export async function searchNearbyVenues(
+  lat: number,
+  lng: number,
+  radiusMeters = 5000
+): Promise<Venue[]> {
+  const params = new URLSearchParams({
+    query: '공연장',
+    category_group_code: 'CT1',
+    x: String(lng),
+    y: String(lat),
+    radius: String(radiusMeters),
+    sort: 'distance',
+    size: '15',
+  });
+
+  const res = await fetch(`${BASE_URL}/search/keyword.json?${params}`, {
+    headers: authHeader(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`주변 공연장 검색 실패: ${err?.message ?? res.statusText}`);
+  }
+
+  const data: KakaoSearchResponse = await res.json();
+  return data.documents.map(doc => ({
+    id: doc.id,
+    name: doc.place_name,
+    address: doc.road_address_name || doc.address_name,
+    lat: parseFloat(doc.y),
+    lng: parseFloat(doc.x),
+    phone: doc.phone || undefined,
+  }));
+}
+
+// ---------- 두 지점 경로 소요시간 (자동차 기준 / 대중교통 fallback) ----------
+export async function getRouteInfo(
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number
+): Promise<{ drivingMinutes: number; distanceMeters: number }> {
+  const params = new URLSearchParams({
+    origin: `${originLng},${originLat}`,
+    destination: `${destLng},${destLat}`,
+    priority: 'RECOMMEND',
+  });
+
+  const res = await fetch(`${MOBILITY_URL}/directions?${params}`, {
+    headers: {
+      Authorization: `KakaoAK ${API_KEY}`,
+    },
+  });
+
+  if (!res.ok) {
+    // 경로 조회 실패 시 직선거리 기반 추정 반환
+    const distanceMeters = haversineDistance(originLat, originLng, destLat, destLng);
+    return {
+      drivingMinutes: Math.round(distanceMeters / 400), // 분속 약 400m 가정
+      distanceMeters,
+    };
+  }
+
+  const data: KakaoRouteResponse = await res.json();
+  const route = data.routes?.[0];
+
+  if (!route || route.result_code !== 0) {
+    const distanceMeters = haversineDistance(originLat, originLng, destLat, destLng);
+    return { drivingMinutes: Math.round(distanceMeters / 400), distanceMeters };
+  }
+
+  return {
+    drivingMinutes: Math.round(route.summary.duration / 60),
+    distanceMeters: route.summary.distance,
+  };
+}
+
+// ---------- 직선 거리 계산 (Haversine) ----------
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // 지구 반지름 (m)
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRad(deg: number): number {
+  return (deg * Math.PI) / 180;
+}
+
+// ---------- 도보 시간 추정 (직선거리 기반) ----------
+export function estimateWalkingMinutes(distanceMeters: number): number {
+  // 평균 도보 속도 약 70m/min
+  return Math.round(distanceMeters / 70);
+}
