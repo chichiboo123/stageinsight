@@ -60,20 +60,18 @@ export interface Performance {
 }
 
 // ---------- 교육과정 성취기준 ----------
-export type CurriculumType = '2022개정' | '2019누리' | '2022특수';
+export type CurriculumType = '2022 개정' | '2022 개정 특수' | '2019 누리과정';
 
-export type SchoolLevel =
-  | '유아' | '초등' | '중등' | '고등' | '특수(유)' | '특수(초)' | '특수(중고)';
+export type SchoolLevel = '유아' | '초등' | '중등' | '고등';
 
 export interface AchievementStandard {
-  id: string;             // e.g. "[6국02-03]"
+  id: string;           // e.g. "2국01-01"
   curriculumType: CurriculumType;
   schoolLevel: SchoolLevel;
-  grade?: string;         // e.g. "3-4학년군"
-  subject: string;        // e.g. "국어", "도덕"
-  domain?: string;        // 영역
-  content: string;        // 성취기준 내용
-  keywords: string[];     // 매칭용 키워드
+  grade: string;        // e.g. "초등학교 1~2학년"
+  subject: string;      // e.g. "국어", "도덕"
+  domain?: string;      // 영역
+  content: string;      // 성취기준 내용
 }
 
 export interface CurriculumMatch {

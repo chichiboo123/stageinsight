@@ -9,9 +9,9 @@ import type { CurriculumType } from '../types';
 import styles from './DashboardPage.module.css';
 
 const CURRICULUM_FILTERS: { label: string; value: CurriculumType }[] = [
-  { label: '2022 개정', value: '2022개정' },
-  { label: '2019 누리', value: '2019누리' },
-  { label: '2022 특수', value: '2022특수' },
+  { label: '2022 개정', value: '2022 개정' },
+  { label: '2022 개정 특수', value: '2022 개정 특수' },
+  { label: '2019 누리과정', value: '2019 누리과정' },
 ];
 
 export function DashboardPage() {
