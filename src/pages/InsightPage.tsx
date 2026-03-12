@@ -3,6 +3,10 @@ import { useApp } from '../contexts/AppContext';
 import type { InsightBoard, InsightItem } from '../types';
 import styles from './InsightPage.module.css';
 
+interface InsightPageProps {
+  onBack?: () => void;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   performance: '🎭 공연',
   standard: '📋 성취기준',
@@ -13,12 +17,15 @@ const TYPE_LABELS: Record<string, string> = {
 // ---------- 내보내기 함수 ----------
 
 function buildTextSummary(board: InsightBoard): string {
-  const lines: string[] = ['🛒 수업 장바구니', ''];
+  const lines: string[] = ['🛒 인사이트 바구니', ''];
   if (board.items.length > 0) {
     lines.push('■ 담은 항목');
     for (const item of board.items) {
       const label = { performance: '[공연]', standard: '[성취기준]', movie: '[영화]', book: '[도서]' }[item.type] ?? `[${item.type}]`;
       lines.push(`  ${label} ${item.title}${item.subtitle ? ' — ' + item.subtitle : ''}`);
+      if (item.detail) {
+        lines.push(`    ${item.detail}`);
+      }
     }
     lines.push('');
   }
@@ -43,13 +50,18 @@ async function copyToClipboard(board: InsightBoard): Promise<boolean> {
   }
 }
 
+function shareAsUrl(board: InsightBoard): string {
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(board))));
+  const url = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+  return url;
+}
+
 function exportAsImage(board: InsightBoard) {
   const W = 760;
   const PAD = 40;
   const LH = 22;
 
-  // 높이 계산
-  let estimatedLines = 4 + board.items.length * 2 + board.memos.reduce((acc, m) => acc + m.content.split('\n').length + 2, 0);
+  let estimatedLines = 4 + board.items.length * 3 + board.memos.reduce((acc, m) => acc + m.content.split('\n').length + 2, 0);
   const H = Math.max(300, PAD * 2 + estimatedLines * LH + 80);
 
   const canvas = document.createElement('canvas');
@@ -60,18 +72,16 @@ function exportAsImage(board: InsightBoard) {
   const ctx = canvas.getContext('2d')!;
   ctx.scale(dpr, dpr);
 
-  // 배경
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  // 상단 강조 바
   ctx.fillStyle = '#4F46E5';
   ctx.fillRect(0, 0, W, 6);
 
   let y = 50;
   ctx.fillStyle = '#1a1a1a';
   ctx.font = 'bold 22px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  ctx.fillText('🛒 수업 장바구니', PAD, y);
+  ctx.fillText('🛒 인사이트 바구니', PAD, y);
   y += 36;
 
   if (board.items.length > 0) {
@@ -91,6 +101,13 @@ function exportAsImage(board: InsightBoard) {
         ctx.fillStyle = '#888888';
         ctx.font = '11px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
         ctx.fillText('    ' + item.subtitle.slice(0, 80), PAD + 8, y);
+        y += LH - 4;
+      }
+      if (item.detail) {
+        ctx.fillStyle = '#666666';
+        ctx.font = '11px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+        const detailText = item.detail.slice(0, 100);
+        ctx.fillText('    ' + detailText, PAD + 8, y);
         y += LH - 4;
       }
     }
@@ -116,7 +133,6 @@ function exportAsImage(board: InsightBoard) {
     }
   }
 
-  // 푸터
   ctx.fillStyle = '#bbbbbb';
   ctx.font = '11px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
   ctx.fillText('created by. 교육뮤지컬 꿈꾸는 치수쌤', PAD, H - 16);
@@ -126,7 +142,7 @@ function exportAsImage(board: InsightBoard) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = '수업장바구니.webp';
+    a.download = '인사이트바구니.webp';
     a.click();
     URL.revokeObjectURL(url);
   }, 'image/webp');
@@ -137,7 +153,7 @@ function exportAsPDF(board: InsightBoard) {
   const w = window.open('', '_blank', 'width=700,height=800');
   if (!w) return;
   w.document.write(`<!doctype html>
-<html><head><meta charset="UTF-8"><title>수업 장바구니</title>
+<html><head><meta charset="UTF-8"><title>인사이트 바구니</title>
 <style>
   body { font-family: "Apple SD Gothic Neo","Malgun Gothic",sans-serif; max-width:600px; margin:40px auto; color:#1a1a1a; line-height:1.8; }
   h1 { font-size:22px; color:#4F46E5; }
@@ -145,7 +161,7 @@ function exportAsPDF(board: InsightBoard) {
   footer { margin-top:40px; color:#aaa; font-size:12px; border-top:1px solid #eee; padding-top:12px; }
   @media print { body { margin:20px; } }
 </style></head><body>
-<h1>🛒 수업 장바구니</h1>
+<h1>🛒 인사이트 바구니</h1>
 <pre>${text.replace(/</g,'&lt;')}</pre>
 <footer>created by. 교육뮤지컬 꿈꾸는 치수쌤</footer>
 <script>window.onload=()=>window.print();<\/script>
@@ -153,16 +169,74 @@ function exportAsPDF(board: InsightBoard) {
   w.document.close();
 }
 
+// ---------- 아이템 상세 팝업 ----------
+function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => void }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000,
+        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--color-bg-primary)', borderRadius: '16px',
+          padding: '24px', maxWidth: '560px', width: '100%', maxHeight: '85vh',
+          overflow: 'auto', boxShadow: 'var(--shadow-xl)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flex: 1 }}>
+            {item.thumbnail && (
+              <img src={item.thumbnail} alt={item.title}
+                style={{ width: '80px', height: '110px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+            )}
+            <div>
+              <span className="tag" style={{ marginBottom: '8px', display: 'inline-block' }}>{TYPE_LABELS[item.type] ?? item.type}</span>
+              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+                {item.title}
+              </h3>
+              {item.subtitle && (
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginTop: '4px' }}>{item.subtitle}</p>
+              )}
+            </div>
+          </div>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }}>×</button>
+        </div>
+        {item.detail && (
+          <div style={{ marginTop: '12px' }}>
+            <h4 style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+              내용
+            </h4>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+              {item.detail}
+            </p>
+          </div>
+        )}
+        <small style={{ display: 'block', marginTop: '16px', fontSize: '11px', color: 'var(--color-text-muted)' }}>
+          담은 날짜: {new Date(item.savedAt).toLocaleDateString('ko-KR')}
+        </small>
+      </div>
+    </div>
+  );
+}
+
 // ---------- 컴포넌트 ----------
 
-export function InsightPage() {
+export function InsightPage({ onBack }: InsightPageProps) {
   const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo } = useApp();
   const { insightBoard } = state;
   const [newMemo, setNewMemo] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [copyMsg, setCopyMsg] = useState('');
+  const [shareMsg, setShareMsg] = useState('');
+  const [selectedItem, setSelectedItem] = useState<InsightItem | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleAddMemo() {
     if (!newMemo.trim()) return;
@@ -189,13 +263,37 @@ export function InsightPage() {
     copyTimerRef.current = setTimeout(() => setCopyMsg(''), 2500);
   }
 
+  async function handleShare() {
+    const url = shareAsUrl(insightBoard);
+    try {
+      await navigator.clipboard.writeText(url);
+      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
+      setShareMsg('✅ 공유 URL 복사됨!');
+      shareTimerRef.current = setTimeout(() => setShareMsg(''), 3000);
+    } catch {
+      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
+      setShareMsg('❌ 복사 실패');
+      shareTimerRef.current = setTimeout(() => setShareMsg(''), 2500);
+    }
+  }
+
+  // 공연별 그룹핑
+  const grouped = groupItemsByPerformance(insightBoard.items);
+
   const totalCount = insightBoard.items.length + insightBoard.memos.length;
   const isEmpty = totalCount === 0;
 
   return (
     <div className={`container ${styles.page}`}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.title}>🛒 수업 장바구니</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          {onBack && (
+            <button className="btn btn-ghost" onClick={onBack} style={{ flexShrink: 0 }}>
+              ← 뒤로가기
+            </button>
+          )}
+          <h1 className={styles.title}>🛒 인사이트 바구니</h1>
+        </div>
         <p className={styles.subtitle}>
           마음에 드는 공연, 성취기준, 미디어를 담고 수업 아이디어를 메모해 보세요.
         </p>
@@ -230,44 +328,71 @@ export function InsightPage() {
               </svg>
               {copyMsg || '클립보드 복사'}
             </button>
+            <button className={`btn btn-outline ${styles.exportBtn}`} onClick={handleShare}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+              {shareMsg || 'URL 공유'}
+            </button>
           </div>
         </div>
       )}
 
       <div className={styles.layout}>
-        {/* 담은 항목 */}
+        {/* 담은 항목 (공연별 그룹) */}
         <section className={styles.section}>
           <h2 className="section-title">담은 항목</h2>
 
           {insightBoard.items.length === 0 ? (
             <div className="empty-state">
               <span style={{ fontSize: '36px' }}>🛒</span>
-              <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서에서 📌 버튼으로 담으세요.</p>
+              <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서에서 📌 담기 버튼으로 담으세요.</p>
             </div>
           ) : (
-            <div className={styles.itemGrid}>
-              {insightBoard.items.map((item: InsightItem) => (
-                <div key={item.id} className={`card ${styles.insightItem}`}>
-                  {item.thumbnail && (
-                    <img src={item.thumbnail} alt={item.title} className={styles.itemThumbnail} />
-                  )}
-                  <div className={styles.itemBody}>
-                    <span className="tag">{TYPE_LABELS[item.type] ?? item.type}</span>
-                    <strong className={styles.itemTitle}>{item.title}</strong>
-                    {item.subtitle && (
-                      <small className={styles.itemSubtitle}>{item.subtitle}</small>
-                    )}
-                    <small className={styles.itemDate}>
-                      {new Date(item.savedAt).toLocaleDateString('ko-KR')}
-                    </small>
+            <div className={styles.groupsContainer}>
+              {grouped.map(group => (
+                <div key={group.performanceId ?? 'ungrouped'} className={styles.performanceGroup}>
+                  <div className={styles.groupHeader}>
+                    <span style={{ fontSize: '18px' }}>🎭</span>
+                    <strong className={styles.groupTitle}>{group.performanceTitle ?? '공연 미지정'}</strong>
+                    <span className="tag" style={{ fontSize: '11px' }}>{group.items.length}개</span>
                   </div>
-                  <button
-                    className={styles.removeBtn}
-                    onClick={() => removeInsightItem(item.id)}
-                    aria-label="삭제"
-                  >
-                    ×
-                  </button>
+                  <div className={styles.itemGrid}>
+                    {group.items.map((item: InsightItem) => (
+                      <div
+                        key={item.id}
+                        className={`card ${styles.insightItem}`}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setSelectedItem(item)}
+                      >
+                        {item.thumbnail && (
+                          <img src={item.thumbnail} alt={item.title} className={styles.itemThumbnail} />
+                        )}
+                        <div className={styles.itemBody}>
+                          <span className="tag">{TYPE_LABELS[item.type] ?? item.type}</span>
+                          <strong className={styles.itemTitle}>{item.title}</strong>
+                          {item.subtitle && (
+                            <small className={styles.itemSubtitle}>{item.subtitle}</small>
+                          )}
+                          {item.detail && (
+                            <p className={styles.itemDetail}>{item.detail}</p>
+                          )}
+                          <small className={styles.itemDate}>
+                            {new Date(item.savedAt).toLocaleDateString('ko-KR')}
+                          </small>
+                        </div>
+                        <button
+                          className={styles.removeBtn}
+                          onClick={e => { e.stopPropagation(); removeInsightItem(item.id); }}
+                          aria-label="삭제"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -350,6 +475,45 @@ export function InsightPage() {
           </div>
         </section>
       </div>
+
+      {/* 아이템 상세 팝업 */}
+      {selectedItem && (
+        <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
     </div>
   );
+}
+
+// ---------- 그룹핑 유틸 ----------
+interface PerformanceGroup {
+  performanceId: string | null;
+  performanceTitle: string | null;
+  items: InsightItem[];
+}
+
+function groupItemsByPerformance(items: InsightItem[]): PerformanceGroup[] {
+  const map = new Map<string, PerformanceGroup>();
+  const ungroupedKey = '__ungrouped__';
+
+  for (const item of items) {
+    const key = item.performanceId ?? ungroupedKey;
+    if (!map.has(key)) {
+      map.set(key, {
+        performanceId: item.performanceId ?? null,
+        performanceTitle: item.performanceTitle ?? null,
+        items: [],
+      });
+    }
+    map.get(key)!.items.push(item);
+  }
+
+  // 공연 항목이 있는 그룹을 먼저 (공연 아이템 자체가 그룹 헤더 역할)
+  const groups = Array.from(map.values());
+  groups.sort((a, b) => {
+    if (a.performanceId === null) return 1;
+    if (b.performanceId === null) return -1;
+    return 0;
+  });
+
+  return groups;
 }
