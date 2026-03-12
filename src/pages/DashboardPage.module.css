@@ -32,6 +32,10 @@
   gap: var(--space-3);
 }
 
+.perfCards li {
+  width: 100%;
+}
+
 .perfCard {
   display: flex;
   gap: var(--space-3);
@@ -300,6 +304,12 @@
   margin-top: var(--space-1);
 }
 
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
@@ -309,12 +319,10 @@
     max-height: none;
   }
   .perfCards {
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: var(--space-2);
+    flex-direction: column;
   }
   .perfCard {
-    min-width: 200px;
+    min-width: 0;
   }
   .standardGrid {
     grid-template-columns: repeat(2, 1fr);
@@ -348,14 +356,18 @@
 
   /* 미디어 카드 — 약간 축소 */
   .mediaCard {
-    min-width: 140px;
-    max-width: 140px;
+    min-width: 100%;
+    max-width: 100%;
   }
   .mediaPoster {
     height: 170px;
   }
   .mediaPosterSkeleton {
     height: 170px;
+  }
+
+  .mediaGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -367,6 +379,10 @@
   }
   .filterBtns {
     width: 100%;
+  }
+
+  .mediaGrid {
+    grid-template-columns: 1fr;
   }
 }
 
