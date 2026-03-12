@@ -447,7 +447,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 {moviesLoading && <LoadingSpinner size="sm" />}
                 {moviesError && <ErrorMessage message={moviesError} />}
                 {!moviesLoading && movies.length > 0 && (
-                  <div className="scroll-x">
+                  <div className={styles.mediaGrid}>
                     {movies.map(movie => (
                       <div
                         key={movie.id}
@@ -503,7 +503,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 {booksLoading && <LoadingSpinner size="sm" />}
                 {booksError && <ErrorMessage message={booksError} />}
                 {!booksLoading && books.length > 0 && (
-                  <div className="scroll-x">
+                  <div className={styles.mediaGrid}>
                     {books.map(book => (
                       <div
                         key={book.isbn}

@@ -54,7 +54,7 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
         onClick: () => onVenueSelect(venue),
       });
     });
-  }, [mapLoaded, venues, selectedSchool]);
+  }, [addMarker, clearMarkers, mapLoaded, onVenueSelect, venues, selectedSchool]);
 
   function handleVenueClick(venue: Venue) {
     panTo(venue.lat, venue.lng);
@@ -95,13 +95,7 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
           )}
           {mapError && (
             <div className={styles.mapOverlay}>
-              <div className={styles.mapErrorBox}>
-                <span style={{ fontSize: '32px' }}>🗺️</span>
-                <p className={styles.mapErrorMsg}>{mapError}</p>
-                <small style={{ color: 'var(--color-text-muted)', fontSize: '12px', textAlign: 'center' }}>
-                  Netlify 환경변수에 VITE_KAKAO_JS_API_KEY를 설정해 주세요.
-                </small>
-              </div>
+              <ErrorMessage message={mapError} onRetry={() => window.location.reload()} />
             </div>
           )}
         </div>

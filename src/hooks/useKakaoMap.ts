@@ -30,6 +30,7 @@ interface KakaoMap {
   setCenter: (latlng: KakaoLatLng) => void;
   setLevel: (level: number) => void;
   getLevel: () => number;
+  relayout?: () => void;
 }
 interface KakaoLatLng {
   getLat: () => number;
@@ -62,64 +63,57 @@ interface UseKakaoMapReturn {
   mapRef: React.RefObject<HTMLDivElement | null>;
   mapLoaded: boolean;
   mapError: string | null;
-  mapInstance: KakaoMap | null;
   addMarker: (options: MarkerOptions) => KakaoMarker | null;
   clearMarkers: () => void;
   panTo: (lat: number, lng: number) => void;
 }
 
 // SDK 스크립트 한 번만 로드
-let sdkState: 'idle' | 'loading' | 'loaded' | 'error' = 'idle';
-let sdkCallbacks: Array<() => void> = [];
-let sdkErrorCallbacks: Array<(msg: string) => void> = [];
+let sdkLoaded = false;
+let sdkLoading = false;
+let sdkError: string | null = null;
+let sdkCallbacks: Array<(error?: string) => void> = [];
 
-function loadKakaoSdk(onSuccess: () => void, onError: (msg: string) => void) {
-  if (sdkState === 'loaded') { onSuccess(); return; }
-  if (sdkState === 'error') { onError('카카오 지도 SDK 로드에 실패했습니다. 페이지를 새로고침해 주세요.'); return; }
-
-  sdkCallbacks.push(onSuccess);
-  sdkErrorCallbacks.push(onError);
-
-  if (sdkState === 'loading') return; // 이미 로딩 중이면 콜백만 등록
-  sdkState = 'loading';
-
-  // API 키 유효성 확인
-  if (!JS_KEY || JS_KEY === 'undefined') {
-    const msg = '카카오 지도 API 키(VITE_KAKAO_JS_API_KEY)가 설정되지 않았습니다. 환경변수를 확인해 주세요.';
-    sdkState = 'error';
-    sdkErrorCallbacks.forEach(cb => cb(msg));
-    sdkCallbacks = [];
-    sdkErrorCallbacks = [];
+function loadKakaoSdk(callback: (error?: string) => void) {
+  if (!JS_KEY) {
+    callback('VITE_KAKAO_JS_API_KEY가 설정되지 않았습니다. Netlify 환경변수를 확인해 주세요.');
     return;
   }
 
+  if (sdkLoaded) { callback(); return; }
+  if (sdkError) { callback(sdkError); return; }
+
+  sdkCallbacks.push(callback);
+  if (sdkLoading || document.getElementById('kakao-maps-sdk')) return;
+
+  sdkLoading = true;
+
   const script = document.createElement('script');
   script.id = 'kakao-maps-sdk';
-  script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${JS_KEY}&autoload=false`;
-
+  script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${JS_KEY}&autoload=false`;
+  script.async = true;
   script.onload = () => {
-    try {
-      window.kakao.maps.load(() => {
-        sdkState = 'loaded';
-        sdkCallbacks.forEach(cb => cb());
-        sdkCallbacks = [];
-        sdkErrorCallbacks = [];
-      });
-    } catch (e) {
-      const msg = '카카오 지도 초기화에 실패했습니다. API 키를 확인해 주세요.';
-      sdkState = 'error';
-      sdkErrorCallbacks.forEach(cb => cb(msg));
+    if (!window.kakao?.maps?.load) {
+      sdkError = '카카오 지도 SDK 초기화에 실패했습니다. 앱 키 도메인 등록을 확인해 주세요.';
+      sdkCallbacks.forEach(cb => cb(sdkError ?? undefined));
       sdkCallbacks = [];
-      sdkErrorCallbacks = [];
+      sdkLoading = false;
+      return;
     }
+
+    window.kakao.maps.load(() => {
+      sdkLoaded = true;
+      sdkLoading = false;
+      sdkCallbacks.forEach(cb => cb());
+      sdkCallbacks = [];
+    });
   };
 
   script.onerror = () => {
-    const msg = '카카오 지도 SDK 로드 실패. 네트워크 연결 또는 API 키(VITE_KAKAO_JS_API_KEY)를 확인해 주세요.';
-    sdkState = 'error';
-    sdkErrorCallbacks.forEach(cb => cb(msg));
+    sdkError = '카카오 지도 SDK 로드 실패. 네트워크/환경변수(VITE_KAKAO_JS_API_KEY)를 확인해 주세요.';
+    sdkLoading = false;
+    sdkCallbacks.forEach(cb => cb(sdkError ?? undefined));
     sdkCallbacks = [];
-    sdkErrorCallbacks = [];
   };
 
   document.head.appendChild(script);
@@ -134,26 +128,42 @@ export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKak
 
   // 지도 초기화
   useEffect(() => {
-    loadKakaoSdk(
-      () => {
-        if (!mapRef.current) return;
-        const options = {
-          center: new window.kakao.maps.LatLng(lat, lng),
-          level,
-        };
-        mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
-        setMapLoaded(true);
-      },
-      (msg) => {
-        setMapError(msg);
+    loadKakaoSdk((error) => {
+      if (error) {
+        setMapError(error);
+        setMapLoaded(false);
+        return;
       }
-    );
-  }, []); // 최초 1회만
+
+      if (!mapRef.current) return;
+      const options = {
+        center: new window.kakao.maps.LatLng(lat, lng),
+        level,
+      };
+      mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+      mapInstanceRef.current.relayout?.();
+      setMapError(null);
+      setMapLoaded(true);
+    });
+  }, [lat, lng, level]);
 
   // 중심 좌표 변경
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
     mapInstanceRef.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
+  }, [lat, lng, mapLoaded]);
+
+  // 리사이즈 대응
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+
+    function handleResize() {
+      mapInstanceRef.current?.relayout?.();
+      mapInstanceRef.current?.setCenter(new window.kakao.maps.LatLng(lat, lng));
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [lat, lng, mapLoaded]);
 
   // 마커 추가
@@ -196,7 +206,6 @@ export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKak
     mapRef,
     mapLoaded,
     mapError,
-    mapInstance: mapInstanceRef.current,
     addMarker,
     clearMarkers,
     panTo,

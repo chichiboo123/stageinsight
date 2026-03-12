@@ -1,7 +1,8 @@
 /* 전체 레이아웃: 지도가 전체를 채우고 사이드바가 오버레이 */
 .layout {
   position: relative;
-  height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
+  min-height: 560px;
   overflow: hidden;
 }
 
@@ -40,6 +41,7 @@
 
 .mapWrapper {
   flex: 1;
+  min-height: 320px;
   position: relative;
   overflow: hidden;
 }
@@ -207,7 +209,8 @@
     inset: auto;
   }
   .layout {
-    height: calc(100vh - 56px); /* 모바일 헤더 56px */
+    height: calc(100dvh - 56px); /* 모바일 헤더 56px */
+    min-height: 620px;
     display: flex;
     flex-direction: column;
   }
