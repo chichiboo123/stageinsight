@@ -8,8 +8,8 @@
 
 import type { Performance, PerformanceGenre, PerformanceState, Venue } from '../types';
 
-const BASE_URL = 'https://www.kopis.or.kr/openApi/restful';
-const API_KEY = import.meta.env.VITE_KOPIS_API_KEY as string;
+const BASE_URL = '/api/kopis';
+const API_KEY = import.meta.env.VITE_KOPIS_KEY as string;
 
 // ---------- 장르 코드 맵핑 ----------
 const GENRE_CODE_MAP: Record<string, PerformanceGenre> = {

@@ -1,0 +1,23 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# KOPIS API CORS 우회 프록시
+[[redirects]]
+  from = "/api/kopis/*"
+  to = "http://www.kopis.or.kr/openApi/restful/:splat"
+  status = 200
+  force = true
+
+# Naver Books API CORS 우회 프록시
+[[redirects]]
+  from = "/api/naver/*"
+  to = "https://openapi.naver.com/:splat"
+  status = 200
+  force = true
+
+# React SPA 새로고침 폴백
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
