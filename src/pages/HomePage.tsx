@@ -36,7 +36,7 @@ export function HomePage({ onSchoolSelect }: HomePageProps) {
               value={query}
               onChange={setQuery}
               onClear={clearResults}
-              placeholder="학교 이름을 입력하세요 (예: 동두천송내초등학교)"
+              placeholder="학교 이름을 입력하세요"
               loading={loading}
               autoFocus
             />

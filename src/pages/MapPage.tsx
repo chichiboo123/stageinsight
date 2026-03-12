@@ -86,8 +86,14 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
           </button>
           <span className={styles.schoolName}>{selectedSchool.name}</span>
         </div>
-        <div ref={mapRef} className={styles.map} />
-        {!mapLoaded && <LoadingSpinner message="지도를 불러오는 중..." />}
+        <div className={styles.mapWrapper}>
+          <div ref={mapRef} className={styles.map} />
+          {!mapLoaded && (
+            <div className={styles.mapOverlay}>
+              <LoadingSpinner message="지도를 불러오는 중..." />
+            </div>
+          )}
+        </div>
       </section>
 
       {/* 오른쪽: 공연장 리스트 */}
