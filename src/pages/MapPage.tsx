@@ -18,7 +18,7 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
 
   const { venues, loading, error, refetch } = useNearbyVenues(selectedSchool, 5000);
 
-  const { mapRef, mapLoaded, addMarker, clearMarkers, panTo } = useKakaoMap({
+  const { mapRef, mapLoaded, mapError, addMarker, clearMarkers, panTo } = useKakaoMap({
     lat: selectedSchool?.lat ?? 37.5665,
     lng: selectedSchool?.lng ?? 126.9780,
     level: 5,
@@ -54,7 +54,7 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
         onClick: () => onVenueSelect(venue),
       });
     });
-  }, [mapLoaded, venues, selectedSchool]);
+  }, [addMarker, clearMarkers, mapLoaded, onVenueSelect, venues, selectedSchool]);
 
   function handleVenueClick(venue: Venue) {
     panTo(venue.lat, venue.lng);
@@ -88,9 +88,14 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
         </div>
         <div className={styles.mapWrapper}>
           <div ref={mapRef} className={styles.map} />
-          {!mapLoaded && (
+          {!mapLoaded && !mapError && (
             <div className={styles.mapOverlay}>
               <LoadingSpinner message="지도를 불러오는 중..." />
+            </div>
+          )}
+          {mapError && (
+            <div className={styles.mapOverlay}>
+              <ErrorMessage message={mapError} onRetry={() => window.location.reload()} />
             </div>
           )}
         </div>
