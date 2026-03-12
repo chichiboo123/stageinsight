@@ -6,9 +6,21 @@
 
 /* 히어로 */
 .hero {
+  position: relative;
   background: var(--gradient-hero);
   padding: var(--space-20) 0 var(--space-16);
   transition: background var(--transition-slow);
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -40px;
+  height: clamp(56px, 10vw, 120px);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg-primary) 0%, transparent), var(--color-bg-primary));
+  pointer-events: none;
 }
 
 .heroContent {
