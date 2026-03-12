@@ -30,7 +30,7 @@ type AppAction =
 // ---------- 초기 상태 ----------
 const INSIGHT_STORAGE_KEY = 'stageinsight-board';
 
-function loadInsightBoard(): InsightBoard {
+function loadFromStorage(): InsightBoard {
   try {
     const raw = localStorage.getItem(INSIGHT_STORAGE_KEY);
     if (raw) return JSON.parse(raw) as InsightBoard;
@@ -44,7 +44,7 @@ const initialState: AppState = {
   selectedSchool: null,
   selectedVenue: null,
   selectedPerformance: null,
-  insightBoard: loadInsightBoard(),
+  insightBoard: loadFromStorage(),
 };
 
 // ---------- Reducer ----------
@@ -62,48 +62,35 @@ function appReducer(state: AppState, action: AppAction): AppState {
         i => i.id === action.payload.id && i.type === action.payload.type
       );
       if (already) return state;
-      const updated = {
-        ...state.insightBoard,
-        items: [...state.insightBoard.items, action.payload],
-      };
-      saveInsightBoard(updated);
+      const updated = { ...state.insightBoard, items: [...state.insightBoard.items, action.payload] };
+      saveBoard(updated);
       return { ...state, insightBoard: updated };
     }
     case 'REMOVE_INSIGHT_ITEM': {
-      const updated = {
-        ...state.insightBoard,
-        items: state.insightBoard.items.filter(i => i.id !== action.payload),
-      };
-      saveInsightBoard(updated);
+      const updated = { ...state.insightBoard, items: state.insightBoard.items.filter(i => i.id !== action.payload) };
+      saveBoard(updated);
       return { ...state, insightBoard: updated };
     }
     case 'ADD_INSIGHT_MEMO': {
-      const updated = {
-        ...state.insightBoard,
-        memos: [...state.insightBoard.memos, action.payload],
-      };
-      saveInsightBoard(updated);
+      const updated = { ...state.insightBoard, memos: [...state.insightBoard.memos, action.payload] };
+      saveBoard(updated);
       return { ...state, insightBoard: updated };
     }
     case 'UPDATE_INSIGHT_MEMO': {
       const updated = {
         ...state.insightBoard,
-        memos: state.insightBoard.memos.map(m =>
-          m.id === action.payload.id ? action.payload : m
-        ),
+        memos: state.insightBoard.memos.map(m => m.id === action.payload.id ? action.payload : m),
       };
-      saveInsightBoard(updated);
+      saveBoard(updated);
       return { ...state, insightBoard: updated };
     }
     case 'DELETE_INSIGHT_MEMO': {
-      const updated = {
-        ...state.insightBoard,
-        memos: state.insightBoard.memos.filter(m => m.id !== action.payload),
-      };
-      saveInsightBoard(updated);
+      const updated = { ...state.insightBoard, memos: state.insightBoard.memos.filter(m => m.id !== action.payload) };
+      saveBoard(updated);
       return { ...state, insightBoard: updated };
     }
     case 'LOAD_INSIGHT_BOARD':
+      saveBoard(action.payload);
       return { ...state, insightBoard: action.payload };
 
     default:
@@ -111,7 +98,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-function saveInsightBoard(board: InsightBoard) {
+function saveBoard(board: InsightBoard) {
   try {
     localStorage.setItem(INSIGHT_STORAGE_KEY, JSON.stringify(board));
   } catch {
@@ -130,6 +117,7 @@ interface AppContextValue {
   addInsightMemo: (content: string) => void;
   updateInsightMemo: (id: string, content: string) => void;
   deleteInsightMemo: (id: string) => void;
+  loadInsightBoard: (board: InsightBoard) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -172,6 +160,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deleteInsightMemo = useCallback((id: string) =>
     dispatch({ type: 'DELETE_INSIGHT_MEMO', payload: id }), []);
 
+  const loadInsightBoard = useCallback((board: InsightBoard) =>
+    dispatch({ type: 'LOAD_INSIGHT_BOARD', payload: board }), []);
+
   return (
     <AppContext.Provider value={{
       state,
@@ -183,6 +174,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addInsightMemo,
       updateInsightMemo,
       deleteInsightMemo,
+      loadInsightBoard,
     }}>
       {children}
     </AppContext.Provider>
