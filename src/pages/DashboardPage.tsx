@@ -356,7 +356,8 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   )}
 
                   <button
-                    className="btn btn-outline"
+                    className={styles.bookmarkBtn}
+                    title="인사이트 바구니에 담기"
                     onClick={() => addInsightItem({
                       type: 'performance',
                       id: displayPerformance!.id,
@@ -369,7 +370,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       savedAt: new Date().toISOString(),
                     })}
                   >
-                    📌 담기
+                    <span className="material-symbols-outlined">bookmark_add</span>
                   </button>
                 </div>
               </section>
@@ -420,8 +421,8 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         ))}
                       </div>
                       <button
-                        className="btn btn-ghost"
-                        style={{ alignSelf: 'flex-start', fontSize: 'var(--font-size-xs)' }}
+                        className={styles.bookmarkBtnSm}
+                        title="인사이트 바구니에 담기"
                         onClick={() => addInsightItem({
                           type: 'standard',
                           id: standard.id,
@@ -433,7 +434,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           savedAt: new Date().toISOString(),
                         })}
                       >
-                        📌 담기
+                        <span className="material-symbols-outlined">bookmark_add</span>
                       </button>
                     </div>
                   ))}
@@ -472,8 +473,8 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           )}
                         </div>
                         <button
-                          className="btn btn-ghost"
-                          style={{ fontSize: '11px', padding: '4px 8px' }}
+                          className={styles.bookmarkBtnSm}
+                          title="인사이트 바구니에 담기"
                           onClick={e => {
                             e.stopPropagation();
                             addInsightItem({
@@ -488,7 +489,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          📌 담기
+                          <span className="material-symbols-outlined">bookmark_add</span>
                         </button>
                       </div>
                     ))}
@@ -526,8 +527,8 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           )}
                         </div>
                         <button
-                          className="btn btn-ghost"
-                          style={{ fontSize: '11px', padding: '4px 8px' }}
+                          className={styles.bookmarkBtnSm}
+                          title="인사이트 바구니에 담기"
                           onClick={e => {
                             e.stopPropagation();
                             addInsightItem({
@@ -543,7 +544,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          📌 담기
+                          <span className="material-symbols-outlined">bookmark_add</span>
                         </button>
                       </div>
                     ))}

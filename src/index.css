@@ -365,6 +365,14 @@ p {
   color: var(--color-text-primary);
 }
 
+/* Material Symbols */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+}
+
 /* 가로 스크롤 컨테이너 */
 .scroll-x {
   display: flex;

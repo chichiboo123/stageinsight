@@ -2,15 +2,11 @@
  * useKakaoMap
  * - 카카오 지도 SDK(JS API) 초기화 및 인스턴스 관리
  * - 마커 추가/제거 헬퍼 제공
- *
- * 사용법:
- *   const { mapRef, mapLoaded, addMarker } = useKakaoMap({ lat, lng, level: 5 });
- *   <div ref={mapRef} style={{ width: '100%', height: '400px' }} />
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const JS_KEY = import.meta.env.VITE_KAKAO_JS_API_KEY as string;
+const JS_KEY = import.meta.env.VITE_KAKAO_JS_API_KEY as string | undefined;
 
 declare global {
   interface Window {
@@ -157,6 +153,7 @@ export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKak
     mapInstanceRef.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
   }, [lat, lng, mapLoaded]);
 
+  // 리사이즈 대응
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
 

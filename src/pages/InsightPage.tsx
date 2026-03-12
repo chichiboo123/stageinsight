@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useApp } from '../contexts/AppContext';
-import type { InsightBoard, InsightItem } from '../types';
+import type { InsightBoard, InsightItem, InsightMemo } from '../types';
 import styles from './InsightPage.module.css';
 
 interface InsightPageProps {
@@ -14,29 +14,73 @@ const TYPE_LABELS: Record<string, string> = {
   book: '📚 도서',
 };
 
-// ---------- 내보내기 함수 ----------
+// ---------- 그룹핑 유틸 ----------
+interface PerformanceGroup {
+  performanceId: string | null;
+  performanceTitle: string | null;
+  items: InsightItem[];
+  memos: InsightMemo[];
+}
 
+function groupByPerformance(items: InsightItem[], memos: InsightMemo[]): PerformanceGroup[] {
+  const map = new Map<string, PerformanceGroup>();
+  const ungroupedKey = '__ungrouped__';
+
+  for (const item of items) {
+    const key = item.performanceId ?? ungroupedKey;
+    if (!map.has(key)) {
+      map.set(key, {
+        performanceId: item.performanceId ?? null,
+        performanceTitle: item.performanceTitle ?? null,
+        items: [],
+        memos: [],
+      });
+    }
+    map.get(key)!.items.push(item);
+  }
+
+  for (const memo of memos) {
+    const key = memo.performanceId ?? ungroupedKey;
+    if (!map.has(key)) {
+      map.set(key, {
+        performanceId: memo.performanceId ?? null,
+        performanceTitle: memo.performanceTitle ?? null,
+        items: [],
+        memos: [],
+      });
+    }
+    map.get(key)!.memos.push(memo);
+  }
+
+  const groups = Array.from(map.values());
+  groups.sort((a, b) => {
+    if (a.performanceId === null) return 1;
+    if (b.performanceId === null) return -1;
+    return 0;
+  });
+
+  return groups;
+}
+
+// ---------- 내보내기 함수 ----------
 function buildTextSummary(board: InsightBoard): string {
+  const groups = groupByPerformance(board.items, board.memos);
   const lines: string[] = ['🛒 인사이트 바구니', ''];
-  if (board.items.length > 0) {
-    lines.push('■ 담은 항목');
-    for (const item of board.items) {
+
+  for (const group of groups) {
+    const title = group.performanceTitle ?? '공연 미지정';
+    lines.push(`■ ${title}`);
+    for (const item of group.items) {
       const label = { performance: '[공연]', standard: '[성취기준]', movie: '[영화]', book: '[도서]' }[item.type] ?? `[${item.type}]`;
       lines.push(`  ${label} ${item.title}${item.subtitle ? ' — ' + item.subtitle : ''}`);
-      if (item.detail) {
-        lines.push(`    ${item.detail}`);
-      }
+      if (item.detail) lines.push(`    ${item.detail}`);
+    }
+    for (const memo of group.memos) {
+      lines.push(`  [메모] ${memo.content}`);
     }
     lines.push('');
   }
-  if (board.memos.length > 0) {
-    lines.push('■ 수업 메모');
-    const sorted = [...board.memos].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    for (const memo of sorted) {
-      lines.push(memo.content);
-      lines.push('');
-    }
-  }
+
   lines.push('created by. 교육뮤지컬 꿈꾸는 치수쌤');
   return lines.join('\n');
 }
@@ -52,29 +96,29 @@ async function copyToClipboard(board: InsightBoard): Promise<boolean> {
 
 function shareAsUrl(board: InsightBoard): string {
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(board))));
-  const url = `${window.location.origin}${window.location.pathname}?share=${encoded}`;
-  return url;
+  return `${window.location.origin}${window.location.pathname}?share=${encoded}`;
 }
 
 function exportAsImage(board: InsightBoard) {
   const W = 760;
   const PAD = 40;
   const LH = 22;
+  const groups = groupByPerformance(board.items, board.memos);
 
-  let estimatedLines = 4 + board.items.length * 3 + board.memos.reduce((acc, m) => acc + m.content.split('\n').length + 2, 0);
+  let estimatedLines = 4;
+  for (const g of groups) {
+    estimatedLines += 2 + g.items.length * 2 + g.memos.reduce((acc, m) => acc + m.content.split('\n').length + 1, 0);
+  }
   const H = Math.max(300, PAD * 2 + estimatedLines * LH + 80);
 
   const canvas = document.createElement('canvas');
   const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
   canvas.width = W * dpr;
   canvas.height = H * dpr;
-
   const ctx = canvas.getContext('2d')!;
   ctx.scale(dpr, dpr);
-
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
-
   ctx.fillStyle = '#4F46E5';
   ctx.fillRect(0, 0, W, 6);
 
@@ -84,18 +128,17 @@ function exportAsImage(board: InsightBoard) {
   ctx.fillText('🛒 인사이트 바구니', PAD, y);
   y += 36;
 
-  if (board.items.length > 0) {
+  for (const group of groups) {
     ctx.fillStyle = '#4F46E5';
     ctx.font = 'bold 13px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-    ctx.fillText('담은 항목', PAD, y);
+    ctx.fillText(`■ ${group.performanceTitle ?? '공연 미지정'}`, PAD, y);
     y += 24;
 
-    for (const item of board.items) {
+    for (const item of group.items) {
       const label = { performance: '🎭', standard: '📋', movie: '🎬', book: '📚' }[item.type] ?? '•';
       ctx.fillStyle = '#333333';
       ctx.font = '13px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-      const title = `${label}  ${item.title}`.slice(0, 70);
-      ctx.fillText(title, PAD + 8, y);
+      ctx.fillText(`${label}  ${item.title}`.slice(0, 70), PAD + 8, y);
       y += LH;
       if (item.subtitle) {
         ctx.fillStyle = '#888888';
@@ -103,34 +146,17 @@ function exportAsImage(board: InsightBoard) {
         ctx.fillText('    ' + item.subtitle.slice(0, 80), PAD + 8, y);
         y += LH - 4;
       }
-      if (item.detail) {
-        ctx.fillStyle = '#666666';
-        ctx.font = '11px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-        const detailText = item.detail.slice(0, 100);
-        ctx.fillText('    ' + detailText, PAD + 8, y);
-        y += LH - 4;
-      }
     }
-    y += 10;
-  }
 
-  if (board.memos.length > 0) {
-    ctx.fillStyle = '#4F46E5';
-    ctx.font = 'bold 13px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-    ctx.fillText('수업 메모', PAD, y);
-    y += 24;
-
-    const sorted = [...board.memos].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    for (const memo of sorted) {
-      const lines = memo.content.split('\n').slice(0, 5);
-      ctx.fillStyle = '#333333';
-      ctx.font = '12px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-      for (const line of lines) {
-        ctx.fillText(line.slice(0, 90), PAD + 8, y);
+    for (const memo of group.memos) {
+      ctx.fillStyle = '#555555';
+      ctx.font = 'italic 12px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+      for (const line of memo.content.split('\n').slice(0, 3)) {
+        ctx.fillText('📝 ' + line.slice(0, 88), PAD + 8, y);
         y += LH - 2;
       }
-      y += 8;
     }
+    y += 8;
   }
 
   ctx.fillStyle = '#bbbbbb';
@@ -162,7 +188,7 @@ function exportAsPDF(board: InsightBoard) {
   @media print { body { margin:20px; } }
 </style></head><body>
 <h1>🛒 인사이트 바구니</h1>
-<pre>${text.replace(/</g,'&lt;')}</pre>
+<pre>${text.replace(/</g, '&lt;')}</pre>
 <footer>created by. 교육뮤지컬 꿈꾸는 치수쌤</footer>
 <script>window.onload=()=>window.print();<\/script>
 </body></html>`);
@@ -224,12 +250,13 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
   );
 }
 
-// ---------- 컴포넌트 ----------
-
+// ---------- 메인 컴포넌트 ----------
 export function InsightPage({ onBack }: InsightPageProps) {
   const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo } = useApp();
   const { insightBoard } = state;
+
   const [newMemo, setNewMemo] = useState('');
+  const [selectedPerfId, setSelectedPerfId] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [copyMsg, setCopyMsg] = useState('');
@@ -238,9 +265,21 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 담긴 공연 목록 (고유)
+  const linkedPerformances = useMemo(() => {
+    const map = new Map<string, string>();
+    insightBoard.items.forEach(item => {
+      if (item.performanceId && !map.has(item.performanceId)) {
+        map.set(item.performanceId, item.performanceTitle ?? item.performanceId);
+      }
+    });
+    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
+  }, [insightBoard.items]);
+
   function handleAddMemo() {
     if (!newMemo.trim()) return;
-    addInsightMemo(newMemo.trim());
+    const perf = linkedPerformances.find(p => p.id === selectedPerfId);
+    addInsightMemo(newMemo.trim(), perf?.id, perf?.title);
     setNewMemo('');
   }
 
@@ -277,9 +316,7 @@ export function InsightPage({ onBack }: InsightPageProps) {
     }
   }
 
-  // 공연별 그룹핑
-  const grouped = groupItemsByPerformance(insightBoard.items);
-
+  const grouped = groupByPerformance(insightBoard.items, insightBoard.memos);
   const totalCount = insightBoard.items.length + insightBoard.memos.length;
   const isEmpty = totalCount === 0;
 
@@ -295,7 +332,7 @@ export function InsightPage({ onBack }: InsightPageProps) {
           <h1 className={styles.title}>🛒 인사이트 바구니</h1>
         </div>
         <p className={styles.subtitle}>
-          마음에 드는 공연, 성취기준, 미디어를 담고 수업 아이디어를 메모해 보세요.
+          공연 작품 · 성취기준 · 미디어 · 메모가 공연별로 함께 관리됩니다.
         </p>
         {totalCount > 0 && (
           <span className="tag" style={{ alignSelf: 'flex-start' }}>
@@ -341,75 +378,148 @@ export function InsightPage({ onBack }: InsightPageProps) {
       )}
 
       <div className={styles.layout}>
-        {/* 담은 항목 (공연별 그룹) */}
+        {/* 왼쪽: 공연별 그룹 (아이템 + 메모) */}
         <section className={styles.section}>
           <h2 className="section-title">담은 항목</h2>
 
-          {insightBoard.items.length === 0 ? (
+          {isEmpty ? (
             <div className="empty-state">
               <span style={{ fontSize: '36px' }}>🛒</span>
-              <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서에서 📌 담기 버튼으로 담으세요.</p>
+              <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서에서 담기 버튼으로 담으세요.</p>
             </div>
           ) : (
             <div className={styles.groupsContainer}>
               {grouped.map(group => (
                 <div key={group.performanceId ?? 'ungrouped'} className={styles.performanceGroup}>
+                  {/* 그룹 헤더 */}
                   <div className={styles.groupHeader}>
                     <span style={{ fontSize: '18px' }}>🎭</span>
                     <strong className={styles.groupTitle}>{group.performanceTitle ?? '공연 미지정'}</strong>
-                    <span className="tag" style={{ fontSize: '11px' }}>{group.items.length}개</span>
+                    <span className="tag" style={{ fontSize: '11px' }}>
+                      {group.items.length + group.memos.length}개
+                    </span>
                   </div>
-                  <div className={styles.itemGrid}>
-                    {group.items.map((item: InsightItem) => (
-                      <div
-                        key={item.id}
-                        className={`card ${styles.insightItem}`}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => setSelectedItem(item)}
-                      >
-                        {item.thumbnail && (
-                          <img src={item.thumbnail} alt={item.title} className={styles.itemThumbnail} />
-                        )}
-                        <div className={styles.itemBody}>
-                          <span className="tag">{TYPE_LABELS[item.type] ?? item.type}</span>
-                          <strong className={styles.itemTitle}>{item.title}</strong>
-                          {item.subtitle && (
-                            <small className={styles.itemSubtitle}>{item.subtitle}</small>
-                          )}
-                          {item.detail && (
-                            <p className={styles.itemDetail}>{item.detail}</p>
-                          )}
-                          <small className={styles.itemDate}>
-                            {new Date(item.savedAt).toLocaleDateString('ko-KR')}
-                          </small>
-                        </div>
-                        <button
-                          className={styles.removeBtn}
-                          onClick={e => { e.stopPropagation(); removeInsightItem(item.id); }}
-                          aria-label="삭제"
+
+                  {/* 아이템 그리드 */}
+                  {group.items.length > 0 && (
+                    <div className={styles.itemGrid}>
+                      {group.items.map((item: InsightItem) => (
+                        <div
+                          key={item.id}
+                          className={`card ${styles.insightItem}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setSelectedItem(item)}
                         >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                          {item.thumbnail && (
+                            <img src={item.thumbnail} alt={item.title} className={styles.itemThumbnail} />
+                          )}
+                          <div className={styles.itemBody}>
+                            <span className="tag">{TYPE_LABELS[item.type] ?? item.type}</span>
+                            <strong className={styles.itemTitle}>{item.title}</strong>
+                            {item.subtitle && (
+                              <small className={styles.itemSubtitle}>{item.subtitle}</small>
+                            )}
+                            {item.detail && (
+                              <p className={styles.itemDetail}>{item.detail}</p>
+                            )}
+                            <small className={styles.itemDate}>
+                              {new Date(item.savedAt).toLocaleDateString('ko-KR')}
+                            </small>
+                          </div>
+                          <button
+                            className={styles.removeBtn}
+                            onClick={e => { e.stopPropagation(); removeInsightItem(item.id); }}
+                            aria-label="삭제"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 이 그룹의 메모 */}
+                  {group.memos.length > 0 && (
+                    <div className={styles.groupMemoList}>
+                      {[...group.memos]
+                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                        .map(memo => (
+                          <div key={memo.id} className={`card ${styles.groupMemoCard}`}>
+                            {editingId === memo.id ? (
+                              <>
+                                <textarea
+                                  className={styles.textarea}
+                                  value={editContent}
+                                  onChange={e => setEditContent(e.target.value)}
+                                  rows={3}
+                                  autoFocus
+                                />
+                                <div className={styles.memoActions}>
+                                  <button className="btn btn-ghost" onClick={() => setEditingId(null)}>취소</button>
+                                  <button className="btn btn-primary" onClick={() => handleSaveEdit(memo.id)}>저장</button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className={styles.groupMemoHeader}>
+                                  <span className={styles.memoIcon}>📝</span>
+                                  <p className={styles.memoContent}>{memo.content}</p>
+                                </div>
+                                <div className={styles.memoBtns}>
+                                  <small className={styles.memoDate}>
+                                    {new Date(memo.updatedAt).toLocaleString('ko-KR')}
+                                  </small>
+                                  <div className={styles.memoEditBtns}>
+                                    <button
+                                      className="btn btn-ghost"
+                                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px' }}
+                                      onClick={() => handleStartEdit(memo.id, memo.content)}
+                                    >수정</button>
+                                    <button
+                                      className="btn btn-ghost"
+                                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px', color: 'var(--color-accent-primary)' }}
+                                      onClick={() => deleteInsightMemo(memo.id)}
+                                    >삭제</button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        {/* 수업 메모 */}
+        {/* 오른쪽: 메모 입력 */}
         <section className={styles.section}>
           <h2 className="section-title">수업 아이디어 메모</h2>
 
           <div className={`card ${styles.memoInput}`}>
+            {linkedPerformances.length > 0 && (
+              <div className={styles.perfSelectRow}>
+                <label className={styles.perfSelectLabel}>공연 연결</label>
+                <select
+                  className={styles.perfSelect}
+                  value={selectedPerfId}
+                  onChange={e => setSelectedPerfId(e.target.value)}
+                >
+                  <option value="">공연 미지정</option>
+                  {linkedPerformances.map(p => (
+                    <option key={p.id} value={p.id}>{p.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <textarea
               className={styles.textarea}
               value={newMemo}
               onChange={e => setNewMemo(e.target.value)}
               placeholder="수업 아이디어, 활동 계획, 참고사항 등을 자유롭게 기록하세요..."
-              rows={4}
+              rows={5}
               onKeyDown={e => {
                 if (e.key === 'Enter' && e.ctrlKey) handleAddMemo();
               }}
@@ -426,94 +536,17 @@ export function InsightPage({ onBack }: InsightPageProps) {
             </div>
           </div>
 
-          <div className={styles.memoList}>
-            {insightBoard.memos.length === 0 && (
-              <p className={styles.emptyMemo}>메모가 없습니다.</p>
-            )}
-            {[...insightBoard.memos]
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-              .map(memo => (
-                <div key={memo.id} className={`card ${styles.memoCard}`}>
-                  {editingId === memo.id ? (
-                    <>
-                      <textarea
-                        className={styles.textarea}
-                        value={editContent}
-                        onChange={e => setEditContent(e.target.value)}
-                        rows={4}
-                        autoFocus
-                      />
-                      <div className={styles.memoActions}>
-                        <button className="btn btn-ghost" onClick={() => setEditingId(null)}>취소</button>
-                        <button className="btn btn-primary" onClick={() => handleSaveEdit(memo.id)}>저장</button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <p className={styles.memoContent}>{memo.content}</p>
-                      <div className={styles.memoBtns}>
-                        <small className={styles.memoDate}>
-                          {new Date(memo.updatedAt).toLocaleString('ko-KR')}
-                        </small>
-                        <div className={styles.memoEditBtns}>
-                          <button
-                            className="btn btn-ghost"
-                            style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px' }}
-                            onClick={() => handleStartEdit(memo.id, memo.content)}
-                          >수정</button>
-                          <button
-                            className="btn btn-ghost"
-                            style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px', color: 'var(--color-accent-primary)' }}
-                            onClick={() => deleteInsightMemo(memo.id)}
-                          >삭제</button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-          </div>
+          {insightBoard.memos.length === 0 && insightBoard.items.length > 0 && (
+            <p className={styles.emptyMemo}>
+              위에서 메모를 추가하면 공연 그룹 안에 함께 표시됩니다.
+            </p>
+          )}
         </section>
       </div>
 
-      {/* 아이템 상세 팝업 */}
       {selectedItem && (
         <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
     </div>
   );
-}
-
-// ---------- 그룹핑 유틸 ----------
-interface PerformanceGroup {
-  performanceId: string | null;
-  performanceTitle: string | null;
-  items: InsightItem[];
-}
-
-function groupItemsByPerformance(items: InsightItem[]): PerformanceGroup[] {
-  const map = new Map<string, PerformanceGroup>();
-  const ungroupedKey = '__ungrouped__';
-
-  for (const item of items) {
-    const key = item.performanceId ?? ungroupedKey;
-    if (!map.has(key)) {
-      map.set(key, {
-        performanceId: item.performanceId ?? null,
-        performanceTitle: item.performanceTitle ?? null,
-        items: [],
-      });
-    }
-    map.get(key)!.items.push(item);
-  }
-
-  // 공연 항목이 있는 그룹을 먼저 (공연 아이템 자체가 그룹 헤더 역할)
-  const groups = Array.from(map.values());
-  groups.sort((a, b) => {
-    if (a.performanceId === null) return 1;
-    if (b.performanceId === null) return -1;
-    return 0;
-  });
-
-  return groups;
 }
