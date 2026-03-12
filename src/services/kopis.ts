@@ -89,9 +89,26 @@ export async function fetchVenueDetail(fcltyCd: string): Promise<Partial<Venue>>
 }
 
 // ---------- XML 파서 유틸 ----------
+
+// XML/HTML 엔티티 디코딩 (&amp; → & 등)
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+// HTML 태그 제거 (sty 태그에 <p>, <img> 포함되는 경우)
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
 function getTagContent(xml: string, tag: string): string {
   const match = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(xml);
-  return match ? match[1].trim() : '';
+  return match ? decodeEntities(match[1].trim()) : '';
 }
 
 function getAllTags(xml: string, tag: string): string[] {
@@ -142,9 +159,9 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
       runtime: getTagContent(db, 'prfruntime') || undefined,
       rating: getTagContent(db, 'prfage') || undefined,
       price: getTagContent(db, 'pcseguidance') || undefined,
-      synopsis: getTagContent(db, 'sty') || undefined,
+      synopsis: stripHtml(getTagContent(db, 'sty')) || undefined,
       cast: castRaw ? castRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-      keywords: extractKeywordsFromSynopsis(getTagContent(db, 'sty')),
+      keywords: extractKeywordsFromSynopsis(stripHtml(getTagContent(db, 'sty'))),
     };
   });
 }
@@ -160,11 +177,18 @@ function parseVenueXml(xml: string): Partial<Venue> {
   };
 }
 
-// ---------- 키워드 추출 (간단한 규칙 기반) ----------
+// ---------- 키워드 추출 (규칙 기반) ----------
 const KEYWORD_PATTERNS = [
-  '사랑', '우정', '가족', '성장', '전쟁', '평화', '자유', '정의',
-  '역사', '판타지', '모험', '음악', '춤', '희극', '비극', '환경',
-  '다양성', '포용', '용기', '꿈', '희망', '과거', '미래', '자연',
+  // 감정·관계
+  '사랑', '우정', '가족', '형제', '부모', '자녀', '갈등', '화해', '용서', '배려',
+  // 가치·덕목
+  '성장', '용기', '꿈', '희망', '정의', '자유', '평화', '다양성', '포용', '책임',
+  // 사회·역사
+  '역사', '전쟁', '민주주의', '공동체', '환경', '자연', '과학', '미래', '과거',
+  // 예술·문화
+  '음악', '춤', '노래', '공연', '판타지', '모험', '동화', '신화', '전래',
+  // 교육적 주제
+  '나눔', '협력', '소통', '창의', '도전', '극복', '다문화', '생명', '우리나라',
 ];
 
 function extractKeywordsFromSynopsis(synopsis: string): string[] {

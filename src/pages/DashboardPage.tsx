@@ -31,12 +31,12 @@ export function DashboardPage() {
   // 교육과정 매칭 (상세 데이터 기준 — synopsis·keywords 활용)
   const { matches, loading: currLoading, activeFilters, setFilters } = useCurriculumMatch(displayPerformance);
 
-  // 연계 미디어 (영화 + 도서)
+  // 연계 미디어 (영화 + 도서) — 상세 데이터(keywords 포함) 기반으로 실행
   const {
     movies, books,
     moviesLoading, booksLoading,
     moviesError, booksError,
-  } = useMediaRecommendations(selectedPerformance);
+  } = useMediaRecommendations(displayPerformance);
 
   if (!selectedVenue) {
     return (
