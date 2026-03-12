@@ -14,7 +14,11 @@ const CURRICULUM_FILTERS: { label: string; value: CurriculumType }[] = [
   { label: '2019 누리과정', value: '2019 누리과정' },
 ];
 
-export function DashboardPage() {
+interface DashboardPageProps {
+  onGoToMap?: () => void;
+}
+
+export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const { state, selectVenue, selectPerformance, addInsightItem } = useApp();
   const { selectedVenue, selectedPerformance } = state;
 
@@ -43,7 +47,7 @@ export function DashboardPage() {
       <div className="empty-state" style={{ padding: 'var(--space-20)' }}>
         <span style={{ fontSize: '48px' }}>🎪</span>
         <p>공연장을 먼저 선택해 주세요.</p>
-        <button className="btn btn-primary" onClick={() => selectVenue(null)}>
+        <button className="btn btn-primary" onClick={() => { selectVenue(null); onGoToMap?.(); }}>
           지도로 돌아가기
         </button>
       </div>
@@ -54,7 +58,7 @@ export function DashboardPage() {
     <div className={`container ${styles.page}`}>
       {/* 브레드크럼 */}
       <nav className={styles.breadcrumb}>
-        <button className="btn btn-ghost" onClick={() => selectVenue(null)}>
+        <button className="btn btn-ghost" onClick={() => { selectVenue(null); onGoToMap?.(); }}>
           ← {selectedVenue.name}
         </button>
       </nav>
