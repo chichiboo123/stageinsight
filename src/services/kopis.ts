@@ -3,7 +3,7 @@
  * 문서: https://www.kopis.or.kr/por/main/openApiUseSrch.do
  *
  * 환경 변수:
- *   VITE_KOPIS_API_KEY=your_service_key
+ *   VITE_KOPIS_KEY=your_service_key
  */
 
 import type { Performance, PerformanceGenre, PerformanceState, Venue } from '../types';
@@ -37,24 +37,34 @@ export async function fetchPerformancesByVenue(
   dateFrom?: string,  // YYYYMMDD
   dateTo?: string,
 ): Promise<Performance[]> {
-  const today = formatDate(new Date());
-  const twoMonthsLater = formatDate(addMonths(new Date(), 2));
+  // 현재 공연 중인 항목도 포함하려면 stdate를 과거로 설정
+  // (공연이 수개월 전에 시작해서 현재 진행 중인 경우도 포함)
+  const threeMonthsAgo = formatDate(addMonths(new Date(), -3));
+  const threeMonthsLater = formatDate(addMonths(new Date(), 3));
 
   const params = new URLSearchParams({
     service: API_KEY,
-    stdate: dateFrom ?? today,
-    eddate: dateTo ?? twoMonthsLater,
+    stdate: dateFrom ?? threeMonthsAgo,
+    eddate: dateTo ?? threeMonthsLater,
     shprfnmfct: venueName,     // 공연시설명 검색
-    rows: '20',
+    rows: '50',
     cpage: '1',
-    prfstate: '01,02',         // 01: 공연예정, 02: 공연중
+    // prfstate는 쉼표 구분자 미지원 — 제거 후 날짜 범위로 필터링
   });
 
   const res = await fetch(`${BASE_URL}/pblprfr?${params}`);
   if (!res.ok) throw new Error(`KOPIS 공연 조회 실패: ${res.statusText}`);
 
   const xml = await res.text();
-  return parsePerformanceListXml(xml);
+  const all = parsePerformanceListXml(xml);
+
+  // 공연완료 제외, 공연중 → 공연예정 순으로 정렬
+  return all
+    .filter(p => p.state !== '공연완료')
+    .sort((a, b) => {
+      const order: Record<string, number> = { '공연중': 0, '공연예정': 1 };
+      return (order[a.state] ?? 2) - (order[b.state] ?? 2);
+    });
 }
 
 // ---------- 공연 상세 조회 ----------
