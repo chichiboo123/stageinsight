@@ -4,21 +4,22 @@ import type { ThemeKey } from '../../types';
 import styles from './Header.module.css';
 
 interface HeaderProps {
+  onHomeClick: () => void;
   onInsightClick: () => void;
   insightCount: number;
 }
 
-export function Header({ onInsightClick, insightCount }: HeaderProps) {
+export function Header({ onHomeClick, onInsightClick, insightCount }: HeaderProps) {
   const { theme, setTheme } = useTheme();
 
   return (
     <header className={styles.header}>
       <div className={`container ${styles.inner}`}>
-        {/* 로고 */}
-        <div className={styles.logo}>
+        {/* 로고 — 클릭 시 홈으로 */}
+        <button className={styles.logo} onClick={onHomeClick} aria-label="홈으로 이동">
           <span className={styles.logoIcon}>🎭</span>
           <span className={styles.logoText}>여기 있어 공연장</span>
-        </div>
+        </button>
 
         {/* 우측 컨트롤 */}
         <div className={styles.controls}>

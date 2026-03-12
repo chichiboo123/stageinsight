@@ -30,6 +30,7 @@ function AppInner() {
   return (
     <>
       <Header
+        onHomeClick={() => setPage('home')}
         onInsightClick={() => setPage(p => p === 'insight' ? 'home' : 'insight')}
         insightCount={insightCount}
       />

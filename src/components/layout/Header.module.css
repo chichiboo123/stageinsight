@@ -16,13 +16,22 @@
   height: 64px;
 }
 
-/* 로고 */
+/* 로고 — 버튼으로 변경, 클릭 시 홈 이동 */
 .logo {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  cursor: default;
+  cursor: pointer;
   user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-md);
+  transition: opacity var(--transition-fast);
+}
+
+.logo:hover {
+  opacity: 0.75;
 }
 
 .logoIcon {
