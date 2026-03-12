@@ -1,6 +1,6 @@
 
 import { useApp } from '../contexts/AppContext';
-import { usePerformances } from '../hooks/usePerformances';
+import { usePerformances, usePerformanceDetail } from '../hooks/usePerformances';
 import { useCurriculumMatch } from '../hooks/useCurriculumMatch';
 import { useMediaRecommendations } from '../hooks/useMediaRecommendations';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
@@ -21,8 +21,15 @@ export function DashboardPage() {
   // 공연 목록
   const { performances, loading: perfLoading, error: perfError } = usePerformances(selectedVenue);
 
-  // 교육과정 매칭 (선택된 공연 기준)
-  const { matches, loading: currLoading, activeFilters, setFilters } = useCurriculumMatch(selectedPerformance);
+  // 공연 상세 (시놉시스·출연진·가격 포함) — 목록 선택 시 자동 호출
+  const { performance: detailedPerformance, loading: detailLoading } = usePerformanceDetail(
+    selectedPerformance?.id ?? null,
+  );
+  // 상세 로드 전까지는 목록 데이터로 fallback
+  const displayPerformance = detailedPerformance ?? selectedPerformance;
+
+  // 교육과정 매칭 (상세 데이터 기준 — synopsis·keywords 활용)
+  const { matches, loading: currLoading, activeFilters, setFilters } = useCurriculumMatch(displayPerformance);
 
   // 연계 미디어 (영화 + 도서)
   const {
@@ -104,39 +111,57 @@ export function DashboardPage() {
             <>
               {/* 공연 상세 */}
               <section className={`card ${styles.perfDetail} fade-in`}>
-                {selectedPerformance.poster && (
+                {displayPerformance!.poster && (
                   <img
-                    src={selectedPerformance.poster}
-                    alt={selectedPerformance.title}
+                    src={displayPerformance!.poster}
+                    alt={displayPerformance!.title}
                     className={styles.detailPoster}
                   />
                 )}
                 <div className={styles.detailInfo}>
                   <div className={styles.detailTags}>
-                    <span className="tag">{selectedPerformance.genre}</span>
-                    {selectedPerformance.rating && (
-                      <span className="tag">{selectedPerformance.rating}</span>
+                    <span className="tag">{displayPerformance!.genre}</span>
+                    {displayPerformance!.rating && (
+                      <span className="tag">{displayPerformance!.rating}</span>
                     )}
-                    {selectedPerformance.runtime && (
-                      <span className="tag">⏱ {selectedPerformance.runtime}</span>
+                    {displayPerformance!.runtime && (
+                      <span className="tag">⏱ {displayPerformance!.runtime}</span>
                     )}
                   </div>
-                  <h2 className={styles.detailTitle}>{selectedPerformance.title}</h2>
-                  <p className={styles.detailVenue}>{selectedPerformance.venue}</p>
-                  {selectedPerformance.synopsis && (
-                    <p className={styles.detailSynopsis}>{selectedPerformance.synopsis}</p>
+                  <h2 className={styles.detailTitle}>{displayPerformance!.title}</h2>
+                  <p className={styles.detailVenue}>{displayPerformance!.venue}</p>
+                  <p className={styles.perfDate}>
+                    {formatDate(displayPerformance!.startDate)} ~ {formatDate(displayPerformance!.endDate)}
+                  </p>
+
+                  {/* 시놉시스 */}
+                  {detailLoading && <p className={styles.emptyText}>공연 소개 불러오는 중...</p>}
+                  {!detailLoading && displayPerformance!.synopsis && (
+                    <div className={styles.synopsisBox}>
+                      <h4 className={styles.synopsisLabel}>공연 소개</h4>
+                      <p className={styles.detailSynopsis}>{displayPerformance!.synopsis}</p>
+                    </div>
                   )}
-                  {selectedPerformance.price && (
-                    <p className={styles.detailPrice}>💰 {selectedPerformance.price}</p>
+
+                  {/* 출연진 */}
+                  {!detailLoading && displayPerformance!.cast && displayPerformance!.cast.length > 0 && (
+                    <div className={styles.castBox}>
+                      <h4 className={styles.synopsisLabel}>출연진</h4>
+                      <p className={styles.castList}>{displayPerformance!.cast.join(' · ')}</p>
+                    </div>
+                  )}
+
+                  {displayPerformance!.price && (
+                    <p className={styles.detailPrice}>💰 {displayPerformance!.price}</p>
                   )}
                   <button
                     className="btn btn-outline"
                     onClick={() => addInsightItem({
                       type: 'performance',
-                      id: selectedPerformance.id,
-                      title: selectedPerformance.title,
-                      subtitle: selectedPerformance.venue,
-                      thumbnail: selectedPerformance.poster,
+                      id: displayPerformance!.id,
+                      title: displayPerformance!.title,
+                      subtitle: displayPerformance!.venue,
+                      thumbnail: displayPerformance!.poster,
                       savedAt: new Date().toISOString(),
                     })}
                   >
