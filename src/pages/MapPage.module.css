@@ -59,6 +59,22 @@
   z-index: 2;
 }
 
+.mapErrorBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  max-width: 320px;
+  text-align: center;
+}
+
+.mapErrorMsg {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
 /* 사이드바 — 지도 위 오버레이 */
 .sidebar {
   position: absolute;

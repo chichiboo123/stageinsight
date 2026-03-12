@@ -138,7 +138,7 @@ interface AppContextValue {
   selectPerformance: (performance: Performance | null) => void;
   addInsightItem: (item: InsightItem) => void;
   removeInsightItem: (id: string) => void;
-  addInsightMemo: (content: string) => void;
+  addInsightMemo: (content: string, performanceId?: string, performanceTitle?: string) => void;
   updateInsightMemo: (id: string, content: string) => void;
   deleteInsightMemo: (id: string) => void;
   loadInsightBoard: (board: InsightBoard) => void;
@@ -162,10 +162,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const removeInsightItem = useCallback((id: string) =>
     dispatch({ type: 'REMOVE_INSIGHT_ITEM', payload: id }), []);
 
-  const addInsightMemo = useCallback((content: string) => {
+  const addInsightMemo = useCallback((content: string, performanceId?: string, performanceTitle?: string) => {
     const memo: InsightMemo = {
       id: crypto.randomUUID(),
       content,
+      performanceId,
+      performanceTitle,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

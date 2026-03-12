@@ -98,6 +98,7 @@
   display: flex;
   gap: var(--space-6);
   padding: var(--space-6);
+  position: relative;
 }
 
 .detailPoster {
@@ -194,14 +195,15 @@
 .standardGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .standardCard {
-  padding: var(--space-5);
+  padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  position: relative;
 }
 
 .standardMeta {
@@ -224,9 +226,9 @@
 }
 
 .standardContent {
-  font-size: var(--font-size-sm);
+  font-size: 13px;
   color: var(--color-text-secondary);
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .matchedKws {
@@ -240,15 +242,70 @@
   color: var(--color-accent-dark);
 }
 
+/* 담기 아이콘 버튼 (공통) */
+.bookmarkBtn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-overlay);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  opacity: 0;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.bookmarkBtnSm {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-overlay);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  opacity: 0;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.perfDetail:hover .bookmarkBtn,
+.standardCard:hover .bookmarkBtnSm,
+.mediaCard:hover .bookmarkBtnSm {
+  opacity: 1;
+}
+
+.bookmarkBtn:hover,
+.bookmarkBtnSm:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+}
+
 /* 미디어 카드 */
 .mediaCard {
-  min-width: 160px;
-  max-width: 160px;
+  min-width: 150px;
+  max-width: 150px;
   flex-shrink: 0;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  position: relative;
 }
 
 .mediaPoster {

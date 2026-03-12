@@ -126,6 +126,8 @@ export interface InsightItem {
 export interface InsightMemo {
   id: string;
   content: string;
+  performanceId?: string;    // 귀속된 공연 ID (그룹핑용)
+  performanceTitle?: string; // 귀속된 공연명
   createdAt: string;
   updatedAt: string;
 }

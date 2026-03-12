@@ -23,266 +23,6 @@
   color: var(--color-text-secondary);
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: 1fr 420px;
-  gap: var(--space-8);
-  align-items: start;
-}
-
-/* 섹션 */
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-/* 공연별 그룹 컨테이너 */
-.groupsContainer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-
-.performanceGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.groupHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-accent-light);
-  border-radius: var(--radius-md);
-  border-left: 4px solid var(--color-accent-primary);
-}
-
-.groupTitle {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  flex: 1;
-}
-
-/* 스크랩 그리드 */
-.itemGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-4);
-}
-
-.insightItem {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  overflow: hidden;
-}
-
-.itemThumbnail {
-  width: 100%;
-  height: 120px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-}
-
-.itemBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.itemTitle {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  line-height: 1.5;
-}
-
-.itemSubtitle {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
-
-.itemDetail {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  white-space: pre-wrap;
-  margin-top: 2px;
-}
-
-.itemDate {
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-
-.removeBtn {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-bg-secondary);
-  color: var(--color-text-muted);
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: none;
-  opacity: 0;
-  transition: opacity var(--transition-fast), background var(--transition-fast);
-}
-
-.insightItem:hover .removeBtn {
-  opacity: 1;
-}
-
-.removeBtn:hover {
-  background: var(--color-border);
-  color: var(--color-text-primary);
-}
-
-/* 메모 */
-.memoInput {
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.textarea {
-  width: 100%;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-primary);
-  background: transparent;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  resize: vertical;
-  outline: none;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  line-height: 1.7;
-}
-
-.textarea:focus {
-  border-color: var(--color-accent-primary);
-  box-shadow: 0 0 0 3px var(--color-accent-light);
-}
-
-.memoActions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.hint {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
-
-.memoList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.emptyMemo {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  text-align: center;
-  padding: var(--space-6);
-}
-
-.memoCard {
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.memoContent {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-primary);
-  white-space: pre-wrap;
-  line-height: 1.7;
-}
-
-.memoBtns {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.memoDate {
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-
-.memoEditBtns {
-  display: flex;
-  gap: var(--space-2);
-}
-
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  /* 페이지 여백 축소 */
-  .page {
-    padding-top: var(--space-5);
-  }
-  /* 제목 행 세로 배치 */
-  .pageHeader {
-    gap: var(--space-2);
-  }
-  /* 내보내기 섹션 — 버튼 2열 그리드 */
-  .exportSection {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--space-3);
-  }
-  .exportBtns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-2);
-  }
-  .exportBtn {
-    justify-content: center;
-    font-size: var(--font-size-xs);
-    padding: 10px 8px;
-  }
-  /* 아이템 그리드 — 소형 화면 2열 */
-  .itemGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  /* 그룹 헤더 간소화 */
-  .groupHeader {
-    padding: var(--space-2) var(--space-3);
-  }
-}
-
-@media (max-width: 380px) {
-  /* 아이템 그리드 — 최소 1열 */
-  .itemGrid {
-    grid-template-columns: 1fr;
-  }
-  /* 내보내기 버튼 1열 */
-  .exportBtns {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* 내보내기 섹션 */
 .exportSection {
   display: flex;
@@ -310,4 +50,317 @@
   gap: 6px;
   font-size: var(--font-size-sm);
   padding: 7px 14px;
+}
+
+/* 2-column layout */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+/* 섹션 */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ─── 공연 그룹 ─── */
+.groupsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.performanceGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-light);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-accent-primary);
+}
+
+.groupTitle {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
+/* 아이템 그리드 */
+.itemGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-3);
+}
+
+.insightItem {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: hidden;
+}
+
+.itemThumbnail {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.itemTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.itemSubtitle {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.itemDetail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.itemDate {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.removeBtn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+
+.insightItem:hover .removeBtn {
+  opacity: 1;
+}
+
+.removeBtn:hover {
+  background: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* ─── 그룹 내 메모 ─── */
+.groupMemoList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 2px dashed var(--color-border);
+  margin-left: var(--space-2);
+}
+
+.groupMemoCard {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-bg-secondary) !important;
+}
+
+.groupMemoHeader {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.memoIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.memoContent {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  line-height: 1.6;
+  flex: 1;
+}
+
+.memoBtns {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.memoDate {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.memoEditBtns {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* ─── 메모 입력 (우측) ─── */
+.memoInput {
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  position: sticky;
+  top: 80px;
+}
+
+/* 공연 선택 드롭다운 */
+.perfSelectRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.perfSelectLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.perfSelect {
+  flex: 1;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.perfSelect:focus {
+  border-color: var(--color-accent-primary);
+}
+
+.textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  line-height: 1.7;
+}
+
+.textarea:focus {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-light);
+}
+
+.memoActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.emptyMemo {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* ─── 반응형 ─── */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .memoInput {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding-top: var(--space-5);
+  }
+  .exportSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .exportBtns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .exportBtn {
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    padding: 10px 8px;
+  }
+  .itemGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .groupHeader {
+    padding: var(--space-2) var(--space-3);
+  }
+  .groupMemoList {
+    padding-left: var(--space-3);
+    margin-left: var(--space-1);
+  }
+}
+
+@media (max-width: 380px) {
+  .itemGrid {
+    grid-template-columns: 1fr;
+  }
+  .exportBtns {
+    grid-template-columns: 1fr;
+  }
 }

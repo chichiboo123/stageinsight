@@ -18,7 +18,7 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
 
   const { venues, loading, error, refetch } = useNearbyVenues(selectedSchool, 5000);
 
-  const { mapRef, mapLoaded, addMarker, clearMarkers, panTo } = useKakaoMap({
+  const { mapRef, mapLoaded, mapError, addMarker, clearMarkers, panTo } = useKakaoMap({
     lat: selectedSchool?.lat ?? 37.5665,
     lng: selectedSchool?.lng ?? 126.9780,
     level: 5,
@@ -88,9 +88,20 @@ export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
         </div>
         <div className={styles.mapWrapper}>
           <div ref={mapRef} className={styles.map} />
-          {!mapLoaded && (
+          {!mapLoaded && !mapError && (
             <div className={styles.mapOverlay}>
               <LoadingSpinner message="지도를 불러오는 중..." />
+            </div>
+          )}
+          {mapError && (
+            <div className={styles.mapOverlay}>
+              <div className={styles.mapErrorBox}>
+                <span style={{ fontSize: '32px' }}>🗺️</span>
+                <p className={styles.mapErrorMsg}>{mapError}</p>
+                <small style={{ color: 'var(--color-text-muted)', fontSize: '12px', textAlign: 'center' }}>
+                  Netlify 환경변수에 VITE_KAKAO_JS_API_KEY를 설정해 주세요.
+                </small>
+              </div>
             </div>
           )}
         </div>

@@ -2,15 +2,11 @@
  * useKakaoMap
  * - 카카오 지도 SDK(JS API) 초기화 및 인스턴스 관리
  * - 마커 추가/제거 헬퍼 제공
- *
- * 사용법:
- *   const { mapRef, mapLoaded, addMarker } = useKakaoMap({ lat, lng, level: 5 });
- *   <div ref={mapRef} style={{ width: '100%', height: '400px' }} />
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const JS_KEY = import.meta.env.VITE_KAKAO_JS_API_KEY as string;
+const JS_KEY = import.meta.env.VITE_KAKAO_JS_API_KEY as string | undefined;
 
 declare global {
   interface Window {
@@ -65,6 +61,7 @@ interface MarkerOptions {
 interface UseKakaoMapReturn {
   mapRef: React.RefObject<HTMLDivElement | null>;
   mapLoaded: boolean;
+  mapError: string | null;
   mapInstance: KakaoMap | null;
   addMarker: (options: MarkerOptions) => KakaoMarker | null;
   clearMarkers: () => void;
@@ -72,44 +69,85 @@ interface UseKakaoMapReturn {
 }
 
 // SDK 스크립트 한 번만 로드
-let sdkLoaded = false;
+let sdkState: 'idle' | 'loading' | 'loaded' | 'error' = 'idle';
 let sdkCallbacks: Array<() => void> = [];
+let sdkErrorCallbacks: Array<(msg: string) => void> = [];
 
-function loadKakaoSdk(callback: () => void) {
-  if (sdkLoaded) { callback(); return; }
-  sdkCallbacks.push(callback);
-  if (document.getElementById('kakao-maps-sdk')) return;
+function loadKakaoSdk(onSuccess: () => void, onError: (msg: string) => void) {
+  if (sdkState === 'loaded') { onSuccess(); return; }
+  if (sdkState === 'error') { onError('카카오 지도 SDK 로드에 실패했습니다. 페이지를 새로고침해 주세요.'); return; }
+
+  sdkCallbacks.push(onSuccess);
+  sdkErrorCallbacks.push(onError);
+
+  if (sdkState === 'loading') return; // 이미 로딩 중이면 콜백만 등록
+  sdkState = 'loading';
+
+  // API 키 유효성 확인
+  if (!JS_KEY || JS_KEY === 'undefined') {
+    const msg = '카카오 지도 API 키(VITE_KAKAO_JS_API_KEY)가 설정되지 않았습니다. 환경변수를 확인해 주세요.';
+    sdkState = 'error';
+    sdkErrorCallbacks.forEach(cb => cb(msg));
+    sdkCallbacks = [];
+    sdkErrorCallbacks = [];
+    return;
+  }
 
   const script = document.createElement('script');
   script.id = 'kakao-maps-sdk';
   script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${JS_KEY}&autoload=false`;
+
   script.onload = () => {
-    window.kakao.maps.load(() => {
-      sdkLoaded = true;
-      sdkCallbacks.forEach(cb => cb());
+    try {
+      window.kakao.maps.load(() => {
+        sdkState = 'loaded';
+        sdkCallbacks.forEach(cb => cb());
+        sdkCallbacks = [];
+        sdkErrorCallbacks = [];
+      });
+    } catch (e) {
+      const msg = '카카오 지도 초기화에 실패했습니다. API 키를 확인해 주세요.';
+      sdkState = 'error';
+      sdkErrorCallbacks.forEach(cb => cb(msg));
       sdkCallbacks = [];
-    });
+      sdkErrorCallbacks = [];
+    }
   };
+
+  script.onerror = () => {
+    const msg = '카카오 지도 SDK 로드 실패. 네트워크 연결 또는 API 키(VITE_KAKAO_JS_API_KEY)를 확인해 주세요.';
+    sdkState = 'error';
+    sdkErrorCallbacks.forEach(cb => cb(msg));
+    sdkCallbacks = [];
+    sdkErrorCallbacks = [];
+  };
+
   document.head.appendChild(script);
 }
 
 export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKakaoMapReturn {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<KakaoMap | null>(null);
   const markersRef = useRef<KakaoMarker[]>([]);
 
   // 지도 초기화
   useEffect(() => {
-    loadKakaoSdk(() => {
-      if (!mapRef.current) return;
-      const options = {
-        center: new window.kakao.maps.LatLng(lat, lng),
-        level,
-      };
-      mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
-      setMapLoaded(true);
-    });
+    loadKakaoSdk(
+      () => {
+        if (!mapRef.current) return;
+        const options = {
+          center: new window.kakao.maps.LatLng(lat, lng),
+          level,
+        };
+        mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+        setMapLoaded(true);
+      },
+      (msg) => {
+        setMapError(msg);
+      }
+    );
   }, []); // 최초 1회만
 
   // 중심 좌표 변경
@@ -157,6 +195,7 @@ export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKak
   return {
     mapRef,
     mapLoaded,
+    mapError,
     mapInstance: mapInstanceRef.current,
     addMarker,
     clearMarkers,
