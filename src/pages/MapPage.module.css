@@ -1,25 +1,29 @@
+/* 전체 레이아웃: 지도가 전체를 채우고 사이드바가 오버레이 */
 .layout {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  height: calc(100vh - 64px); /* 헤더 높이 제외 */
+  position: relative;
+  height: calc(100vh - 64px);
   overflow: hidden;
 }
 
-/* 지도 섹션 */
+/* 지도 섹션 — 전체 영역 */
 .mapSection {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
 
 .mapHeader {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-3) var(--space-5);
   background: var(--color-bg-overlay);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--color-border);
+  z-index: 5;
+  flex-shrink: 0;
 }
 
 .backBtn {
@@ -39,23 +43,33 @@
   width: 100%;
 }
 
-/* 사이드바 */
+/* 사이드바 — 지도 위 오버레이 */
 .sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 340px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--color-bg-overlay);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.10);
+  z-index: 10;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-primary);
-  border-left: 1px solid var(--color-border);
-  overflow-y: auto;
 }
 
 .sidebarHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-5) var(--space-6) var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-3);
   position: sticky;
   top: 0;
-  background: var(--color-bg-primary);
+  background: var(--color-bg-overlay);
+  backdrop-filter: blur(16px);
   z-index: var(--z-base);
   border-bottom: 1px solid var(--color-border-light);
 }
@@ -69,10 +83,11 @@
 /* 공연장 리스트 */
 .venueList {
   list-style: none;
-  padding: var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  flex: 1;
 }
 
 .venueCard {
@@ -81,10 +96,17 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   text-align: left;
   cursor: pointer;
   border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.venueCard:hover {
+  background: var(--color-accent-light);
+  border-color: var(--color-accent-primary);
 }
 
 .venueInfo {
@@ -96,24 +118,24 @@
 }
 
 .venueIcon {
-  font-size: 22px;
+  font-size: 20px;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .venueName {
   display: block;
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-1);
+  margin-bottom: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .venueAddress {
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   color: var(--color-text-muted);
   margin-bottom: var(--space-2);
   overflow: hidden;
@@ -128,22 +150,32 @@
 }
 
 .chevron {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: 300px 1fr;
-    height: auto;
-  }
+@media (max-width: 700px) {
   .sidebar {
-    height: auto;
-    max-height: none;
+    width: 100%;
+    height: 45%;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
     border-left: none;
     border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.10);
+  }
+  .mapSection {
+    height: 55%;
+    position: relative;
+    inset: auto;
+  }
+  .layout {
+    height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
   }
 }

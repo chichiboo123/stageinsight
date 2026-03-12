@@ -9,9 +9,10 @@ import styles from './MapPage.module.css';
 
 interface MapPageProps {
   onVenueSelect: (venue: Venue) => void;
+  onGoToHome?: () => void;
 }
 
-export function MapPage({ onVenueSelect }: MapPageProps) {
+export function MapPage({ onVenueSelect, onGoToHome }: MapPageProps) {
   const { state, selectSchool } = useApp();
   const { selectedSchool } = state;
 
@@ -65,7 +66,7 @@ export function MapPage({ onVenueSelect }: MapPageProps) {
       <div className="empty-state">
         <span style={{ fontSize: '48px' }}>🏫</span>
         <p>먼저 학교를 검색해 주세요.</p>
-        <button className="btn btn-primary" onClick={() => selectSchool(null)}>
+        <button className="btn btn-primary" onClick={() => { selectSchool(null); onGoToHome?.(); }}>
           학교 검색으로 돌아가기
         </button>
       </div>
@@ -79,7 +80,7 @@ export function MapPage({ onVenueSelect }: MapPageProps) {
         <div className={styles.mapHeader}>
           <button
             className={`btn btn-ghost ${styles.backBtn}`}
-            onClick={() => selectSchool(null)}
+            onClick={() => { selectSchool(null); onGoToHome?.(); }}
           >
             ← 학교 재검색
           </button>

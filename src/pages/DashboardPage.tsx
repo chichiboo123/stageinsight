@@ -155,8 +155,43 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                     </div>
                   )}
 
+                  {/* 제작진 */}
+                  {!detailLoading && displayPerformance!.crew && displayPerformance!.crew.length > 0 && (
+                    <div className={styles.castBox}>
+                      <h4 className={styles.synopsisLabel}>제작진</h4>
+                      <p className={styles.castList}>{displayPerformance!.crew.join(' · ')}</p>
+                    </div>
+                  )}
+
                   {displayPerformance!.price && (
                     <p className={styles.detailPrice}>💰 {displayPerformance!.price}</p>
+                  )}
+
+                  {/* 공연 소개 이미지 */}
+                  {!detailLoading && displayPerformance!.images && displayPerformance!.images.length > 0 && (
+                    <div className={styles.imagesBox}>
+                      <h4 className={styles.synopsisLabel}>공연 소개 이미지</h4>
+                      <div className={styles.imagesScroll}>
+                        {displayPerformance!.images.map((src, i) => (
+                          <img key={i} src={src} alt={`공연 소개 이미지 ${String(i + 1)}`} className={styles.introImage} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 관련 동영상 */}
+                  {!detailLoading && displayPerformance!.relates && displayPerformance!.relates.length > 0 && (
+                    <div className={styles.castBox}>
+                      <h4 className={styles.synopsisLabel}>관련 동영상</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {displayPerformance!.relates.map((r, i) => (
+                          <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-accent-primary)', textDecoration: 'none' }}>
+                            ▶ {r.name || r.url}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   <button
                     className="btn btn-outline"
@@ -206,9 +241,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   {matches.map(({ standard, matchedKeywords, score }) => (
                     <div key={standard.id} className={`card ${styles.standardCard}`}>
                       <div className={styles.standardMeta}>
-                        <span className="tag">{standard.curriculumType}</span>
-                        <span className="tag">{standard.subject}</span>
-                        {standard.grade && <span className="tag">{standard.grade}</span>}
+                        <div className={styles.standardTags}>
+                          <span className="tag">{standard.curriculumType}</span>
+                          <span className="tag">{standard.subject}</span>
+                          {standard.grade && <span className="tag">{standard.grade}</span>}
+                        </div>
                         <span className={styles.score}>{Math.round(score * 100)}% 일치</span>
                       </div>
                       <code className={styles.standardId}>{standard.id}</code>
@@ -333,6 +370,8 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
 }
 
 function formatDate(d: string): string {
-  if (!d || d.length < 8) return d;
+  if (!d) return '';
+  if (d.includes('.')) return d; // 이미 포맷된 날짜 (YYYY.MM.DD)
+  if (d.length < 8) return d;
   return `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
 }
