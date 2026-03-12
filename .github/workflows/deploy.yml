@@ -2,7 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'claude/**'
   workflow_dispatch:
 
 permissions:
@@ -34,7 +36,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_KAKAO_MAP_KEY: ${{ secrets.VITE_KAKAO_MAP_KEY }}
+          VITE_KAKAO_REST_API_KEY: ${{ secrets.VITE_KAKAO_REST_API_KEY }}
+          VITE_KAKAO_JS_API_KEY: ${{ secrets.VITE_KAKAO_JS_API_KEY }}
           VITE_KOPIS_KEY: ${{ secrets.VITE_KOPIS_KEY }}
           VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
           VITE_NAVER_CLIENT_ID: ${{ secrets.VITE_NAVER_CLIENT_ID }}
