@@ -29,20 +29,34 @@ type AppAction =
 
 // ---------- 초기 상태 ----------
 const INSIGHT_STORAGE_KEY = 'stageinsight-board';
+const SCHOOL_STORAGE_KEY  = 'stageinsight-school';
+const VENUE_STORAGE_KEY   = 'stageinsight-venue';
 
 function loadFromStorage(): InsightBoard {
   try {
     const raw = localStorage.getItem(INSIGHT_STORAGE_KEY);
     if (raw) return JSON.parse(raw) as InsightBoard;
-  } catch {
-    // ignore
-  }
+  } catch { /* ignore */ }
   return { items: [], memos: [] };
 }
 
+function loadSchool(): School | null {
+  try {
+    const raw = localStorage.getItem(SCHOOL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as School : null;
+  } catch { return null; }
+}
+
+function loadVenue(): Venue | null {
+  try {
+    const raw = localStorage.getItem(VENUE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as Venue : null;
+  } catch { return null; }
+}
+
 const initialState: AppState = {
-  selectedSchool: null,
-  selectedVenue: null,
+  selectedSchool: loadSchool(),
+  selectedVenue: loadVenue(),
   selectedPerformance: null,
   insightBoard: loadFromStorage(),
 };
@@ -51,8 +65,10 @@ const initialState: AppState = {
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SELECT_SCHOOL':
+      saveSchool(action.payload); saveVenue(null);
       return { ...state, selectedSchool: action.payload, selectedVenue: null, selectedPerformance: null };
     case 'SELECT_VENUE':
+      saveVenue(action.payload);
       return { ...state, selectedVenue: action.payload, selectedPerformance: null };
     case 'SELECT_PERFORMANCE':
       return { ...state, selectedPerformance: action.payload };
@@ -99,11 +115,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
 }
 
 function saveBoard(board: InsightBoard) {
+  try { localStorage.setItem(INSIGHT_STORAGE_KEY, JSON.stringify(board)); } catch { /* ignore */ }
+}
+function saveSchool(school: School | null) {
   try {
-    localStorage.setItem(INSIGHT_STORAGE_KEY, JSON.stringify(board));
-  } catch {
-    // ignore
-  }
+    if (school) localStorage.setItem(SCHOOL_STORAGE_KEY, JSON.stringify(school));
+    else localStorage.removeItem(SCHOOL_STORAGE_KEY);
+  } catch { /* ignore */ }
+}
+function saveVenue(venue: Venue | null) {
+  try {
+    if (venue) localStorage.setItem(VENUE_STORAGE_KEY, JSON.stringify(venue));
+    else localStorage.removeItem(VENUE_STORAGE_KEY);
+  } catch { /* ignore */ }
 }
 
 // ---------- Context ----------

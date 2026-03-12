@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { Header } from './components/layout/Header';
@@ -8,7 +8,9 @@ import { DashboardPage } from './pages/DashboardPage';
 import { InsightPage } from './pages/InsightPage';
 import type { School, Venue, InsightBoard } from './types';
 
-type Page = 'home' | 'map' | 'dashboard' | 'insight';
+export type Page = 'home' | 'map' | 'dashboard' | 'insight';
+const VALID_PAGES: Page[] = ['home', 'map', 'dashboard', 'insight'];
+const PAGE_KEY = 'stageinsight-page';
 
 const HELP_CONTENT = [
   { step: '1', title: '학교 검색', desc: '홈 화면에서 학교 이름을 검색하세요.' },
@@ -22,20 +24,62 @@ const HELP_CONTENT = [
 
 function AppInner() {
   const { state, selectSchool, selectVenue, loadInsightBoard } = useApp();
-  const [page, setPage] = useState<Page>('home');
   const [showHelp, setShowHelp] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── 페이지 상태 (localStorage 초기화 + 유효성 검사) ──
+  const [page, setPageState] = useState<Page>(() => {
+    const saved = localStorage.getItem(PAGE_KEY) as Page | null;
+    // 학교나 공연장이 없으면 map/dashboard로 복원하지 않음
+    if (saved === 'map' && !state.selectedSchool) return 'home';
+    if (saved === 'dashboard' && !state.selectedVenue) return saved === 'dashboard' ? 'map' : 'home';
+    return saved && VALID_PAGES.includes(saved) ? saved : 'home';
+  });
+
+  // ── History API ──
+  const navigateTo = useCallback((newPage: Page) => {
+    localStorage.setItem(PAGE_KEY, newPage);
+    history.pushState({ page: newPage }, '');
+    setPageState(newPage);
+  }, []);
+
+  useEffect(() => {
+    // 앱 시작 시 현재 페이지로 replaceState
+    history.replaceState({ page }, '');
+
+    function handlePopState(e: PopStateEvent) {
+      const prev = e.state?.page as Page | undefined;
+      const target = prev && VALID_PAGES.includes(prev) ? prev : 'home';
+      localStorage.setItem(PAGE_KEY, target);
+      setPageState(target);
+    }
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── 네비게이션 핸들러 ──
   function handleSchoolSelect(school: School) {
     selectSchool(school);
-    setPage('map');
+    navigateTo('map');
   }
 
   function handleVenueSelect(venue: Venue) {
     selectVenue(venue);
-    setPage('dashboard');
+    navigateTo('dashboard');
   }
 
+  function handleGoToHome() {
+    selectSchool(null);
+    navigateTo('home');
+  }
+
+  function handleGoToMap() {
+    selectVenue(null);
+    navigateTo('map');
+  }
+
+  // ── JSON 저장/불러오기 ──
   function handleSaveJSON() {
     const json = JSON.stringify(state.insightBoard, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
@@ -57,46 +101,36 @@ function AppInner() {
         if (data && Array.isArray(data.items) && Array.isArray(data.memos)) {
           loadInsightBoard(data);
         }
-      } catch {
-        // invalid JSON
-      }
+      } catch { /* invalid JSON */ }
     };
     reader.readAsText(file);
     e.target.value = '';
   }
 
-  // insightBoard 아이템 수 계산
   const insightCount = state.insightBoard.items.length + state.insightBoard.memos.length;
 
   return (
     <>
       <Header
-        onHomeClick={() => setPage('home')}
-        onInsightClick={() => setPage(p => p === 'insight' ? 'home' : 'insight')}
+        onHomeClick={() => navigateTo('home')}
+        onInsightClick={() => navigateTo(page === 'insight' ? 'home' : 'insight')}
         insightCount={insightCount}
         onSaveJSON={handleSaveJSON}
         onLoadJSON={() => fileInputRef.current?.click()}
         onHelpClick={() => setShowHelp(true)}
       />
+
       <div style={{ flex: 1 }}>
-        {page === 'home' && (
-          <HomePage onSchoolSelect={handleSchoolSelect} />
-        )}
-        {page === 'map' && (
-          <MapPage onVenueSelect={handleVenueSelect} />
-        )}
-        {page === 'dashboard' && (
-          <DashboardPage onGoToMap={() => setPage('map')} />
-        )}
-        {page === 'insight' && (
-          <InsightPage />
-        )}
+        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} />}
+        {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
+        {page === 'dashboard' && <DashboardPage onGoToMap={handleGoToMap} />}
+        {page === 'insight'   && <InsightPage />}
       </div>
 
       {/* 푸터 */}
       <footer style={{
         borderTop: '1px solid var(--color-border)',
-        padding: '16px 0',
+        padding: '14px 0',
         textAlign: 'center',
         fontSize: '13px',
         color: 'var(--color-text-muted)',
@@ -118,8 +152,7 @@ function AppInner() {
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
             background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '20px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
           }}
           onClick={() => setShowHelp(false)}
         >
@@ -150,18 +183,13 @@ function AppInner() {
                 </div>
               ))}
             </div>
-            <button
-              className="btn btn-primary"
-              style={{ width: '100%', marginTop: '24px' }}
-              onClick={() => setShowHelp(false)}
-            >
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: '24px' }} onClick={() => setShowHelp(false)}>
               확인
             </button>
           </div>
         </div>
       )}
 
-      {/* JSON 불러오기 숨김 input */}
       <input
         ref={fileInputRef}
         type="file"

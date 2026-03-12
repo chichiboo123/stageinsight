@@ -211,12 +211,7 @@
   align-items: center;
 }
 
-.score {
-  font-size: var(--font-size-xs);
-  color: var(--color-accent-primary);
-  font-weight: var(--font-weight-semibold);
-  margin-left: auto;
-}
+/* .score moved to bottom with correct layout */
 
 .standardId {
   font-size: var(--font-size-sm);
@@ -321,4 +316,43 @@
   .perfCard {
     min-width: 200px;
   }
+}
+
+/* 성취기준 태그와 점수 분리 레이아웃 */
+.standardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+/* score는 margin-left: auto 제거하고 align-self로 처리 */
+.score {
+  font-size: var(--font-size-xs);
+  color: var(--color-accent-primary);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+/* 공연 소개 이미지 */
+.imagesBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.imagesScroll {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.introImage {
+  height: 180px;
+  width: auto;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
 }

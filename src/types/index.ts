@@ -57,6 +57,9 @@ export interface Performance {
   synopsis?: string;
   keywords?: string[];
   cast?: string[];
+  crew?: string[];    // prfcrew 제작진
+  images?: string[];  // styurls 공연 소개 이미지
+  relates?: Array<{ name: string; url: string }>;  // 관련 동영상
 }
 
 // ---------- 교육과정 성취기준 ----------

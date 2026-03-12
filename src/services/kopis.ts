@@ -153,6 +153,25 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
   return dbs.map(db => {
     const genreCd = getTagContent(db, 'genrenm');
     const castRaw = getTagContent(db, 'prfcast');
+    const crewRaw = getTagContent(db, 'prfcrew');
+
+    // styurls > styurl (공연 소개 이미지)
+    const styurlsMatch = /<styurls>([\s\S]*?)<\/styurls>/.exec(db);
+    const images = styurlsMatch
+      ? getAllTags(styurlsMatch[1], 'styurl').map(u => u.trim()).filter(Boolean)
+      : [];
+
+    // relates > relate (관련 동영상)
+    const relatesMatch = /<relates>([\s\S]*?)<\/relates>/.exec(db);
+    const relates: Array<{ name: string; url: string }> = [];
+    if (relatesMatch) {
+      for (const r of getAllTags(relatesMatch[1], 'relate')) {
+        const name = getTagContent(r, 'relatenm').trim();
+        const url  = getTagContent(r, 'relateurl').trim();
+        if (url) relates.push({ name, url });
+      }
+    }
+
     return {
       id: getTagContent(db, 'mt20id'),
       title: getTagContent(db, 'prfnm'),
@@ -168,6 +187,9 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
       price: getTagContent(db, 'pcseguidance') || undefined,
       synopsis: stripHtml(getTagContent(db, 'sty')) || undefined,
       cast: castRaw ? castRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+      crew: crewRaw ? crewRaw.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+      images: images.length > 0 ? images : undefined,
+      relates: relates.length > 0 ? relates : undefined,
       keywords: extractKeywords(
         stripHtml(getTagContent(db, 'sty')),
         getTagContent(db, 'prfnm'),
