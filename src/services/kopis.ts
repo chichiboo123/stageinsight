@@ -101,6 +101,11 @@ function decodeEntities(text: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
+// CDATA 섹션 추출: <![CDATA[...]]> → 내부 텍스트
+function extractCDATA(text: string): string {
+  return text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+}
+
 // HTML 태그 제거 (sty 태그에 <p>, <img> 포함되는 경우)
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
@@ -108,7 +113,9 @@ function stripHtml(html: string): string {
 
 function getTagContent(xml: string, tag: string): string {
   const match = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(xml);
-  return match ? decodeEntities(match[1].trim()) : '';
+  if (!match) return '';
+  // 순서: 엔티티 디코딩 → CDATA 추출 → (sty의 경우 stripHtml은 호출부에서 처리)
+  return extractCDATA(decodeEntities(match[1].trim()));
 }
 
 function getAllTags(xml: string, tag: string): string[] {
@@ -161,7 +168,11 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
       price: getTagContent(db, 'pcseguidance') || undefined,
       synopsis: stripHtml(getTagContent(db, 'sty')) || undefined,
       cast: castRaw ? castRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
-      keywords: extractKeywordsFromSynopsis(stripHtml(getTagContent(db, 'sty'))),
+      keywords: extractKeywords(
+        stripHtml(getTagContent(db, 'sty')),
+        getTagContent(db, 'prfnm'),
+        GENRE_CODE_MAP[genreCd] ?? genreCd,
+      ),
     };
   });
 }
@@ -191,9 +202,34 @@ const KEYWORD_PATTERNS = [
   '나눔', '협력', '소통', '창의', '도전', '극복', '다문화', '생명', '우리나라',
 ];
 
-function extractKeywordsFromSynopsis(synopsis: string): string[] {
-  if (!synopsis) return [];
-  return KEYWORD_PATTERNS.filter(kw => synopsis.includes(kw));
+// 장르 → 관련 키워드 맵
+const GENRE_KEYWORD_MAP: Record<string, string[]> = {
+  '뮤지컬': ['음악', '노래', '춤', '공연', '성장'],
+  '연극':   ['갈등', '소통', '공연', '이야기'],
+  '무용':   ['춤', '음악', '공연', '창의'],
+  '클래식': ['음악', '공연', '창의'],
+  '국악':   ['음악', '우리나라', '전래', '공연'],
+  '오페라': ['음악', '노래', '공연'],
+  '서커스/마술': ['모험', '창의', '공연'],
+  '복합':   ['공연', '창의'],
+};
+
+function extractKeywords(synopsis: string, title: string, genre: string): string[] {
+  const fromSynopsis = KEYWORD_PATTERNS.filter(kw => synopsis.includes(kw));
+  // 시놉시스에서 충분한 키워드를 얻었으면 그대로 반환
+  if (fromSynopsis.length >= 3) return fromSynopsis;
+
+  // 제목 단어에서 추가 키워드 추출
+  const titleWords = title.match(/[가-힣]{2,}/g) ?? [];
+  const fromTitle = KEYWORD_PATTERNS.filter(
+    kw => titleWords.some(w => w.includes(kw) || kw.includes(w)),
+  );
+
+  // 장르 기반 기본 키워드 추가 (항상 포함)
+  const fromGenre = GENRE_KEYWORD_MAP[genre] ?? [];
+
+  // 중복 제거 후 반환
+  return [...new Set([...fromSynopsis, ...fromTitle, ...fromGenre])];
 }
 
 // ---------- 날짜 유틸 ----------

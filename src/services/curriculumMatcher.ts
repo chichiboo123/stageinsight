@@ -106,5 +106,23 @@ export async function matchCurriculum(
     .filter(m => m.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  return scored.slice(0, topN);
+  // 매칭 결과가 있으면 그대로 반환
+  if (scored.length > 0) return scored.slice(0, topN);
+
+  // 결과 0건: 키워드를 더 넓게 해석 — synopsis 내 2~4글자 한글 단어 직접 매칭
+  if (synopsis) {
+    const words = [...new Set(synopsis.match(/[가-힣]{2,4}/g) ?? [])];
+    const fallback: CurriculumMatch[] = filtered
+      .map(standard => {
+        const contentLower = standard.content.toLowerCase();
+        const matched = words.filter(w => contentLower.includes(w));
+        const score = matched.length > 0 ? Math.min(matched.length / 10, 1) : 0;
+        return { standard, score, matchedKeywords: matched };
+      })
+      .filter(m => m.score > 0)
+      .sort((a, b) => b.score - a.score);
+    if (fallback.length > 0) return fallback.slice(0, topN);
+  }
+
+  return [];
 }
