@@ -36,6 +36,13 @@ interface NaverBookResponse {
   items: NaverBookItem[];
 }
 
+const RELIGION_BLOCKLIST = ['교회', '불교', '하나님', '부처님'];
+
+function isReligiousBook(book: Book): boolean {
+  const target = `${book.title} ${book.author} ${book.publisher} ${book.description}`.toLowerCase();
+  return RELIGION_BLOCKLIST.some(word => target.includes(word.toLowerCase()));
+}
+
 function mapNaverBook(item: NaverBookItem): Book {
   // 네이버 API는 HTML 태그 포함 가능 → 제거
   const clean = (s: string) => s.replace(/<[^>]+>/g, '').trim();
@@ -72,7 +79,7 @@ export async function searchBooks(query: string, display = 10): Promise<Book[]> 
   if (!res.ok) throw new Error(`네이버 도서 검색 실패: ${res.statusText}`);
 
   const data: NaverBookResponse = await res.json();
-  return data.items.map(mapNaverBook);
+  return data.items.map(mapNaverBook).filter(book => !isReligiousBook(book));
 }
 
 // ---------- 공연 연계 도서 추천 ----------

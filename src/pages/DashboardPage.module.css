@@ -32,6 +32,10 @@
   gap: var(--space-3);
 }
 
+.perfCards li {
+  width: 100%;
+}
+
 .perfCard {
   display: flex;
   gap: var(--space-3);
@@ -98,6 +102,7 @@
   display: flex;
   gap: var(--space-6);
   padding: var(--space-6);
+  position: relative;
 }
 
 .detailPoster {
@@ -198,10 +203,11 @@
 }
 
 .standardCard {
-  padding: var(--space-5);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  position: relative;
 }
 
 .standardMeta {
@@ -245,10 +251,11 @@
   min-width: 160px;
   max-width: 160px;
   flex-shrink: 0;
-  padding: var(--space-3);
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  position: relative;
 }
 
 .mediaPoster {
@@ -300,6 +307,32 @@
   margin-top: var(--space-1);
 }
 
+.mediaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-3);
+}
+
+.saveIconBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  color: var(--color-accent-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.saveIconBtn:hover {
+  background: var(--color-accent-light);
+}
+
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
@@ -309,12 +342,10 @@
     max-height: none;
   }
   .perfCards {
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: var(--space-2);
+    flex-direction: column;
   }
   .perfCard {
-    min-width: 200px;
+    min-width: 0;
   }
   .standardGrid {
     grid-template-columns: repeat(2, 1fr);
@@ -348,14 +379,18 @@
 
   /* 미디어 카드 — 약간 축소 */
   .mediaCard {
-    min-width: 140px;
-    max-width: 140px;
+    min-width: 100%;
+    max-width: 100%;
   }
   .mediaPoster {
     height: 170px;
   }
   .mediaPosterSkeleton {
     height: 170px;
+  }
+
+  .mediaGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -367,6 +402,10 @@
   }
   .filterBtns {
     width: 100%;
+  }
+
+  .mediaGrid {
+    grid-template-columns: 1fr;
   }
 }
 

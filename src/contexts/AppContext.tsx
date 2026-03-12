@@ -35,7 +35,19 @@ const VENUE_STORAGE_KEY   = 'stageinsight-venue';
 function loadFromStorage(): InsightBoard {
   try {
     const raw = localStorage.getItem(INSIGHT_STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as InsightBoard;
+    if (raw) {
+      const parsed = JSON.parse(raw) as InsightBoard;
+      return {
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+        memos: Array.isArray(parsed.memos)
+          ? parsed.memos.map(m => ({
+            ...m,
+            performanceId: m.performanceId ?? null,
+            performanceTitle: m.performanceTitle ?? null,
+          }))
+          : [],
+      };
+    }
   } catch { /* ignore */ }
   return { items: [], memos: [] };
 }
@@ -138,7 +150,7 @@ interface AppContextValue {
   selectPerformance: (performance: Performance | null) => void;
   addInsightItem: (item: InsightItem) => void;
   removeInsightItem: (id: string) => void;
-  addInsightMemo: (content: string) => void;
+  addInsightMemo: (content: string, performanceId?: string | null, performanceTitle?: string | null) => void;
   updateInsightMemo: (id: string, content: string) => void;
   deleteInsightMemo: (id: string) => void;
   loadInsightBoard: (board: InsightBoard) => void;
@@ -162,9 +174,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const removeInsightItem = useCallback((id: string) =>
     dispatch({ type: 'REMOVE_INSIGHT_ITEM', payload: id }), []);
 
-  const addInsightMemo = useCallback((content: string) => {
+  const addInsightMemo = useCallback((content: string, performanceId?: string | null, performanceTitle?: string | null) => {
     const memo: InsightMemo = {
       id: crypto.randomUUID(),
+      performanceId: performanceId ?? null,
+      performanceTitle: performanceTitle ?? null,
       content,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

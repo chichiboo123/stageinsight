@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useApp } from '../contexts/AppContext';
-import type { InsightBoard, InsightItem } from '../types';
+import type { InsightBoard, InsightItem, InsightMemo } from '../types';
 import styles from './InsightPage.module.css';
 
 interface InsightPageProps {
@@ -230,6 +230,7 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo } = useApp();
   const { insightBoard } = state;
   const [newMemo, setNewMemo] = useState('');
+  const [memoPerformanceId, setMemoPerformanceId] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [copyMsg, setCopyMsg] = useState('');
@@ -240,7 +241,8 @@ export function InsightPage({ onBack }: InsightPageProps) {
 
   function handleAddMemo() {
     if (!newMemo.trim()) return;
-    addInsightMemo(newMemo.trim());
+    const selectedPerformance = performanceOptions.find(p => p.id === memoPerformanceId) ?? null;
+    addInsightMemo(newMemo.trim(), selectedPerformance?.id ?? null, selectedPerformance?.title ?? null);
     setNewMemo('');
   }
 
@@ -278,7 +280,10 @@ export function InsightPage({ onBack }: InsightPageProps) {
   }
 
   // 공연별 그룹핑
-  const grouped = groupItemsByPerformance(insightBoard.items);
+  const grouped = groupByPerformance(insightBoard.items, insightBoard.memos);
+  const performanceOptions = grouped
+    .filter(group => group.performanceId !== null)
+    .map(group => ({ id: group.performanceId!, title: group.performanceTitle ?? '공연 미지정' }));
 
   const totalCount = insightBoard.items.length + insightBoard.memos.length;
   const isEmpty = totalCount === 0;
@@ -345,10 +350,10 @@ export function InsightPage({ onBack }: InsightPageProps) {
         <section className={styles.section}>
           <h2 className="section-title">담은 항목</h2>
 
-          {insightBoard.items.length === 0 ? (
+          {grouped.length === 0 ? (
             <div className="empty-state">
               <span style={{ fontSize: '36px' }}>🛒</span>
-              <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서에서 📌 담기 버튼으로 담으세요.</p>
+              <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서 카드의 저장 아이콘으로 담아보세요.</p>
             </div>
           ) : (
             <div className={styles.groupsContainer}>
@@ -393,6 +398,19 @@ export function InsightPage({ onBack }: InsightPageProps) {
                       </div>
                     ))}
                   </div>
+
+                  {group.memos.length > 0 && (
+                    <div className={styles.groupMemoList}>
+                      {group.memos
+                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                        .map(memo => (
+                          <div key={memo.id} className={`card ${styles.groupMemoCard}`}>
+                            <p className={styles.memoContent}>{memo.content}</p>
+                            <small className={styles.memoDate}>{new Date(memo.updatedAt).toLocaleString('ko-KR')}</small>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -404,6 +422,19 @@ export function InsightPage({ onBack }: InsightPageProps) {
           <h2 className="section-title">수업 아이디어 메모</h2>
 
           <div className={`card ${styles.memoInput}`}>
+            <label className={styles.memoSelectLabel}>
+              메모 귀속 작품
+              <select
+                className={styles.memoSelect}
+                value={memoPerformanceId}
+                onChange={e => setMemoPerformanceId(e.target.value)}
+              >
+                <option value="">공연 미지정</option>
+                {performanceOptions.map(perf => (
+                  <option key={perf.id} value={perf.id}>{perf.title}</option>
+                ))}
+              </select>
+            </label>
             <textarea
               className={styles.textarea}
               value={newMemo}
@@ -451,6 +482,9 @@ export function InsightPage({ onBack }: InsightPageProps) {
                   ) : (
                     <>
                       <p className={styles.memoContent}>{memo.content}</p>
+                      {memo.performanceTitle && (
+                        <span className="tag" style={{ alignSelf: 'flex-start' }}>🎭 {memo.performanceTitle}</span>
+                      )}
                       <div className={styles.memoBtns}>
                         <small className={styles.memoDate}>
                           {new Date(memo.updatedAt).toLocaleString('ko-KR')}
@@ -489,9 +523,10 @@ interface PerformanceGroup {
   performanceId: string | null;
   performanceTitle: string | null;
   items: InsightItem[];
+  memos: InsightMemo[];
 }
 
-function groupItemsByPerformance(items: InsightItem[]): PerformanceGroup[] {
+function groupByPerformance(items: InsightItem[], memos: InsightMemo[]): PerformanceGroup[] {
   const map = new Map<string, PerformanceGroup>();
   const ungroupedKey = '__ungrouped__';
 
@@ -502,9 +537,23 @@ function groupItemsByPerformance(items: InsightItem[]): PerformanceGroup[] {
         performanceId: item.performanceId ?? null,
         performanceTitle: item.performanceTitle ?? null,
         items: [],
+        memos: [],
       });
     }
     map.get(key)!.items.push(item);
+  }
+
+  for (const memo of memos) {
+    const key = memo.performanceId ?? ungroupedKey;
+    if (!map.has(key)) {
+      map.set(key, {
+        performanceId: memo.performanceId ?? null,
+        performanceTitle: memo.performanceTitle ?? null,
+        items: [],
+        memos: [],
+      });
+    }
+    map.get(key)!.memos.push(memo);
   }
 
   // 공연 항목이 있는 그룹을 먼저 (공연 아이템 자체가 그룹 헤더 역할)

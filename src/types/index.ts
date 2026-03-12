@@ -125,6 +125,8 @@ export interface InsightItem {
 
 export interface InsightMemo {
   id: string;
+  performanceId: string | null;
+  performanceTitle: string | null;
   content: string;
   createdAt: string;
   updatedAt: string;

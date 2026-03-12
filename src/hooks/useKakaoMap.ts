@@ -34,6 +34,7 @@ interface KakaoMap {
   setCenter: (latlng: KakaoLatLng) => void;
   setLevel: (level: number) => void;
   getLevel: () => number;
+  relayout?: () => void;
 }
 interface KakaoLatLng {
   getLat: () => number;
@@ -65,7 +66,7 @@ interface MarkerOptions {
 interface UseKakaoMapReturn {
   mapRef: React.RefObject<HTMLDivElement | null>;
   mapLoaded: boolean;
-  mapInstance: KakaoMap | null;
+  mapError: string | null;
   addMarker: (options: MarkerOptions) => KakaoMarker | null;
   clearMarkers: () => void;
   panTo: (lat: number, lng: number) => void;
@@ -73,49 +74,99 @@ interface UseKakaoMapReturn {
 
 // SDK 스크립트 한 번만 로드
 let sdkLoaded = false;
-let sdkCallbacks: Array<() => void> = [];
+let sdkLoading = false;
+let sdkError: string | null = null;
+let sdkCallbacks: Array<(error?: string) => void> = [];
 
-function loadKakaoSdk(callback: () => void) {
+function loadKakaoSdk(callback: (error?: string) => void) {
+  if (!JS_KEY) {
+    callback('VITE_KAKAO_JS_API_KEY가 설정되지 않았습니다. Netlify 환경변수를 확인해 주세요.');
+    return;
+  }
+
   if (sdkLoaded) { callback(); return; }
+  if (sdkError) { callback(sdkError); return; }
+
   sdkCallbacks.push(callback);
-  if (document.getElementById('kakao-maps-sdk')) return;
+  if (sdkLoading || document.getElementById('kakao-maps-sdk')) return;
+
+  sdkLoading = true;
 
   const script = document.createElement('script');
   script.id = 'kakao-maps-sdk';
-  script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${JS_KEY}&autoload=false`;
+  script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${JS_KEY}&autoload=false&libraries=services`;
+  script.async = true;
   script.onload = () => {
+    if (!window.kakao?.maps?.load) {
+      sdkError = '카카오 지도 SDK 초기화에 실패했습니다. 앱 키 도메인 등록을 확인해 주세요.';
+      sdkCallbacks.forEach(cb => cb(sdkError ?? undefined));
+      sdkCallbacks = [];
+      sdkLoading = false;
+      return;
+    }
+
     window.kakao.maps.load(() => {
       sdkLoaded = true;
+      sdkLoading = false;
       sdkCallbacks.forEach(cb => cb());
       sdkCallbacks = [];
     });
   };
+
+  script.onerror = () => {
+    sdkError = '카카오 지도 SDK 로드 실패. 네트워크/환경변수(VITE_KAKAO_JS_API_KEY)를 확인해 주세요.';
+    sdkLoading = false;
+    sdkCallbacks.forEach(cb => cb(sdkError ?? undefined));
+    sdkCallbacks = [];
+  };
+
   document.head.appendChild(script);
 }
 
 export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKakaoMapReturn {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<KakaoMap | null>(null);
   const markersRef = useRef<KakaoMarker[]>([]);
 
   // 지도 초기화
   useEffect(() => {
-    loadKakaoSdk(() => {
+    loadKakaoSdk((error) => {
+      if (error) {
+        setMapError(error);
+        setMapLoaded(false);
+        return;
+      }
+
       if (!mapRef.current) return;
       const options = {
         center: new window.kakao.maps.LatLng(lat, lng),
         level,
       };
       mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+      mapInstanceRef.current.relayout?.();
+      setMapError(null);
       setMapLoaded(true);
     });
-  }, []); // 최초 1회만
+  }, [lat, lng, level]);
 
   // 중심 좌표 변경
   useEffect(() => {
     if (!mapInstanceRef.current || !mapLoaded) return;
     mapInstanceRef.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
+  }, [lat, lng, mapLoaded]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+
+    function handleResize() {
+      mapInstanceRef.current?.relayout?.();
+      mapInstanceRef.current?.setCenter(new window.kakao.maps.LatLng(lat, lng));
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [lat, lng, mapLoaded]);
 
   // 마커 추가
@@ -157,7 +208,7 @@ export function useKakaoMap({ lat, lng, level = 5 }: UseKakaoMapOptions): UseKak
   return {
     mapRef,
     mapLoaded,
-    mapInstance: mapInstanceRef.current,
+    mapError,
     addMarker,
     clearMarkers,
     panTo,
