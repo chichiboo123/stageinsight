@@ -80,10 +80,10 @@ export async function recommendBooksForPerformance(
   performanceTitle: string,
   keywords: string[] = [],
 ): Promise<Book[]> {
-  const queries = [performanceTitle, ...keywords].slice(0, 3);
+  const queries = [performanceTitle, ...keywords].slice(0, 4);
 
   const results = await Promise.allSettled(
-    queries.map(q => searchBooks(q, 6))
+    queries.map(q => searchBooks(q, 10))
   );
 
   const seen = new Set<string>();
@@ -99,5 +99,5 @@ export async function recommendBooksForPerformance(
       }
     }
   }
-  return merged.slice(0, 8);
+  return merged.slice(0, 20);
 }

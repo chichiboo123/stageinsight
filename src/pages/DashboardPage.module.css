@@ -190,10 +190,10 @@
   color: var(--color-text-muted);
 }
 
-/* 성취기준 그리드 */
+/* 성취기준 그리드 — 3열 고정 */
 .standardGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-4);
 }
 
@@ -316,6 +316,15 @@
   .perfCard {
     min-width: 200px;
   }
+  .standardGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .standardGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 성취기준 태그와 점수 분리 레이아웃 */
@@ -347,6 +356,8 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   transition: opacity var(--transition-fast);
+  align-self: flex-start;
+  text-align: left;
 }
 
 .introLink:hover {

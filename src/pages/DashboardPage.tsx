@@ -403,7 +403,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 )}
 
                 <div className={styles.standardGrid}>
-                  {matches.map(({ standard, matchedKeywords, score }) => (
+                  {matches.map(({ standard, matchedKeywords }) => (
                     <div key={standard.id} className={`card ${styles.standardCard}`}>
                       <div className={styles.standardMeta}>
                         <div className={styles.standardTags}>
@@ -411,7 +411,6 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           <span className="tag">{standard.subject}</span>
                           {standard.grade && <span className="tag">{standard.grade}</span>}
                         </div>
-                        <span className={styles.score}>{Math.round(score * 100)}% 일치</span>
                       </div>
                       <code className={styles.standardId}>{standard.id}</code>
                       <p className={styles.standardContent}>{standard.content}</p>
