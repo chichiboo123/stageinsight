@@ -456,3 +456,53 @@ p {
   background: var(--color-border);
   margin: var(--space-6) 0;
 }
+
+/* ============================================================
+   모바일 전역 최적화
+   ============================================================ */
+@media (max-width: 768px) {
+  /* 컨테이너 패딩 축소 */
+  .container {
+    padding: 0 var(--space-4);
+  }
+
+  /* 섹션 타이틀 크기 축소 */
+  .section-title {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-4);
+  }
+
+  /* 카드 hover 효과 제거 (터치 기기에서 불필요) */
+  .card:hover {
+    transform: none;
+  }
+
+  /* 빈 상태 패딩 축소 */
+  .empty-state {
+    padding: var(--space-10);
+  }
+}
+
+@media (max-width: 480px) {
+  /* 컨테이너 최소 패딩 */
+  .container {
+    padding: 0 var(--space-3);
+  }
+
+  /* 버튼 최소 터치 영역 44px */
+  .btn {
+    min-height: 44px;
+  }
+
+  /* 가로 스크롤 터치 가속 */
+  .scroll-x {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: var(--space-2);
+  }
+
+  /* 빈 상태 패딩 더 축소 */
+  .empty-state {
+    padding: var(--space-8);
+  }
+}

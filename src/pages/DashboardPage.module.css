@@ -325,6 +325,49 @@
   .standardGrid {
     grid-template-columns: 1fr;
   }
+
+  /* 공연 상세 — 세로 배치 */
+  .perfDetail {
+    flex-direction: column;
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+  .detailPoster {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+  }
+  .detailTitle {
+    font-size: var(--font-size-xl);
+  }
+
+  /* 페이지 상단 여백 축소 */
+  .page {
+    padding-top: var(--space-3);
+  }
+
+  /* 미디어 카드 — 약간 축소 */
+  .mediaCard {
+    min-width: 140px;
+    max-width: 140px;
+  }
+  .mediaPoster {
+    height: 170px;
+  }
+  .mediaPosterSkeleton {
+    height: 170px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 필터 버튼 한 줄 전부 표시 */
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .filterBtns {
+    width: 100%;
+  }
 }
 
 /* 성취기준 태그와 점수 분리 레이아웃 */
