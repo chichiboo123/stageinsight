@@ -37,6 +37,36 @@
   gap: var(--space-5);
 }
 
+/* 공연별 그룹 컨테이너 */
+.groupsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.performanceGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-accent-light);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-accent-primary);
+}
+
+.groupTitle {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
 /* 스크랩 그리드 */
 .itemGrid {
   display: grid;
@@ -70,15 +100,20 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.5;
 }
 
 .itemSubtitle {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
+}
+
+.itemDetail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin-top: 2px;
 }
 
 .itemDate {
@@ -198,6 +233,52 @@
 
 @media (max-width: 900px) {
   .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  /* 페이지 여백 축소 */
+  .page {
+    padding-top: var(--space-5);
+  }
+  /* 제목 행 세로 배치 */
+  .pageHeader {
+    gap: var(--space-2);
+  }
+  /* 내보내기 섹션 — 버튼 2열 그리드 */
+  .exportSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .exportBtns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .exportBtn {
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    padding: 10px 8px;
+  }
+  /* 아이템 그리드 — 소형 화면 2열 */
+  .itemGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* 그룹 헤더 간소화 */
+  .groupHeader {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (max-width: 380px) {
+  /* 아이템 그리드 — 최소 1열 */
+  .itemGrid {
+    grid-template-columns: 1fr;
+  }
+  /* 내보내기 버튼 1열 */
+  .exportBtns {
     grid-template-columns: 1fr;
   }
 }

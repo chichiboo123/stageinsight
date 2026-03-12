@@ -17,9 +17,9 @@ const HELP_CONTENT = [
   { step: '2', title: '공연장 선택', desc: '지도에서 주변 공연장을 클릭하세요.' },
   { step: '3', title: '공연 선택', desc: '현재 공연 목록에서 원하는 공연을 선택하세요.' },
   { step: '4', title: '교육과정 연계', desc: '성취기준, 연계 영화·도서가 자동으로 표시됩니다.' },
-  { step: '5', title: '장바구니 담기', desc: '📌 버튼으로 마음에 드는 항목을 장바구니에 담으세요.' },
-  { step: '6', title: '내보내기', desc: '장바구니에서 이미지·PDF 저장, 클립보드 복사가 가능합니다.' },
-  { step: '7', title: 'JSON 저장/불러오기', desc: '💾 버튼으로 장바구니 데이터를 파일로 저장하거나 불러올 수 있습니다.' },
+  { step: '5', title: '인사이트 바구니 담기', desc: '📌 담기 버튼으로 마음에 드는 항목을 인사이트 바구니에 담으세요.' },
+  { step: '6', title: '내보내기', desc: '인사이트 바구니에서 이미지·PDF 저장, 클립보드 복사, URL 공유가 가능합니다.' },
+  { step: '7', title: 'JSON 저장/불러오기', desc: '💾 버튼으로 인사이트 바구니 데이터를 파일로 저장하거나 불러올 수 있습니다.' },
 ];
 
 function AppInner() {
@@ -29,12 +29,35 @@ function AppInner() {
 
   // ── 페이지 상태 (localStorage 초기화 + 유효성 검사) ──
   const [page, setPageState] = useState<Page>(() => {
+    // URL share 파라미터가 있으면 insight 페이지로 시작
+    if (new URLSearchParams(window.location.search).has('share')) return 'insight';
     const saved = localStorage.getItem(PAGE_KEY) as Page | null;
     // 학교나 공연장이 없으면 map/dashboard로 복원하지 않음
     if (saved === 'map' && !state.selectedSchool) return 'home';
     if (saved === 'dashboard' && !state.selectedVenue) return saved === 'dashboard' ? 'map' : 'home';
     return saved && VALID_PAGES.includes(saved) ? saved : 'home';
   });
+
+  // 인사이트 바구니를 열기 전 페이지 기억 (뒤로가기용)
+  const prevPageRef = useRef<Page>('home');
+
+  // ── URL share 초기 로드 ──
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareParam = params.get('share');
+    if (shareParam) {
+      try {
+        const decoded = JSON.parse(atob(shareParam)) as InsightBoard;
+        if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
+          loadInsightBoard(decoded);
+        }
+      } catch { /* invalid share data */ }
+      // URL에서 share 파라미터 제거
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── History API ──
   const navigateTo = useCallback((newPage: Page) => {
@@ -86,7 +109,7 @@ function AppInner() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = '수업장바구니.json';
+    a.download = '인사이트바구니.json';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -113,7 +136,14 @@ function AppInner() {
     <>
       <Header
         onHomeClick={() => navigateTo('home')}
-        onInsightClick={() => navigateTo(page === 'insight' ? 'home' : 'insight')}
+        onInsightClick={() => {
+          if (page !== 'insight') {
+            prevPageRef.current = page;
+            navigateTo('insight');
+          } else {
+            navigateTo(prevPageRef.current);
+          }
+        }}
         insightCount={insightCount}
         onSaveJSON={handleSaveJSON}
         onLoadJSON={() => fileInputRef.current?.click()}
@@ -124,7 +154,9 @@ function AppInner() {
         {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} />}
         {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
         {page === 'dashboard' && <DashboardPage onGoToMap={handleGoToMap} />}
-        {page === 'insight'   && <InsightPage />}
+        {page === 'insight'   && (
+          <InsightPage onBack={() => navigateTo(prevPageRef.current)} />
+        )}
       </div>
 
       {/* 푸터 */}

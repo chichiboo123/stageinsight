@@ -117,7 +117,10 @@ export interface InsightItem {
   title: string;
   subtitle?: string;
   thumbnail?: string;
-  savedAt: string;      // ISO 날짜
+  detail?: string;           // 전체 내용 (시놉시스, 줄거리, 성취기준 내용 등)
+  performanceId?: string;    // 담을 때 선택된 공연 ID (그룹핑용)
+  performanceTitle?: string; // 담을 때 선택된 공연명
+  savedAt: string;           // ISO 날짜
 }
 
 export interface InsightMemo {

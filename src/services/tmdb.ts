@@ -81,7 +81,7 @@ export async function searchMoviesByKeywords(keywords: string[], title?: string)
 
   const data: TMDBSearchResponse = await searchRes.json();
   return data.results
-    .slice(0, 10)
+    .slice(0, 20)
     .map(item => mapTMDB(item, genreMap));
 }
 
@@ -92,7 +92,7 @@ export async function recommendMoviesForPerformance(
 ): Promise<Movie[]> {
   // 1차: 공연 제목으로 검색
   // 2차: 키워드로 검색
-  // 중복 제거 후 상위 8개 반환
+  // 중복 제거 후 상위 20개 반환
   const [byTitle, byKeywords] = await Promise.all([
     searchMoviesByKeywords([], performanceTitle).catch(() => [] as Movie[]),
     keywords.length > 0
@@ -108,5 +108,5 @@ export async function recommendMoviesForPerformance(
       merged.push(m);
     }
   }
-  return merged.slice(0, 8);
+  return merged.slice(0, 20);
 }
