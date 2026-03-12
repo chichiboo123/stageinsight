@@ -131,14 +131,32 @@
   color: var(--color-text-secondary);
 }
 
+.synopsisBox,
+.castBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.synopsisLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .detailSynopsis {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
-  line-height: 1.7;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.castList {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
 }
 
 .detailPrice {
