@@ -22,8 +22,8 @@ export function HomePage({ onSchoolSelect }: HomePageProps) {
       <section className={styles.hero}>
         <div className={`container ${styles.heroContent}`}>
           <h1 className={styles.heroTitle}>
-            학교 주변의 공연장을<br />
-            <span className={styles.heroAccent}>함께 발견</span>해요
+            학교와 예술을<br />
+            <span className={styles.heroAccent}>연결하다</span>
           </h1>
           <p className={styles.heroSubtitle}>
             학교명을 검색하면 주변 공연장과 진행 중인 공연을 찾아드립니다.<br />
@@ -108,7 +108,7 @@ const FEATURES = [
   },
   {
     icon: '🎬',
-    title: '문화 확장',
+    title: '예술의 확장',
     desc: '공연과 연계된 영화(TMDB)와 추천 도서(네이버북)로 심화 학습을 설계하세요.',
   },
 ];

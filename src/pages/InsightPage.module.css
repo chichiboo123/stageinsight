@@ -237,6 +237,52 @@
   }
 }
 
+@media (max-width: 600px) {
+  /* 페이지 여백 축소 */
+  .page {
+    padding-top: var(--space-5);
+  }
+  /* 제목 행 세로 배치 */
+  .pageHeader {
+    gap: var(--space-2);
+  }
+  /* 내보내기 섹션 — 버튼 2열 그리드 */
+  .exportSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .exportBtns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2);
+  }
+  .exportBtn {
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    padding: 10px 8px;
+  }
+  /* 아이템 그리드 — 소형 화면 2열 */
+  .itemGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* 그룹 헤더 간소화 */
+  .groupHeader {
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+@media (max-width: 380px) {
+  /* 아이템 그리드 — 최소 1열 */
+  .itemGrid {
+    grid-template-columns: 1fr;
+  }
+  /* 내보내기 버튼 1열 */
+  .exportBtns {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* 내보내기 섹션 */
 .exportSection {
   display: flex;
