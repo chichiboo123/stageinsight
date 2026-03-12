@@ -10,7 +10,7 @@ import type { Movie } from '../types';
 
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE = 'https://image.tmdb.org/t/p';
-const API_KEY = import.meta.env.VITE_TMDB_API_KEY as string;
+const API_KEY = import.meta.env.VITE_TMDB_KEY as string;
 
 // ---------- 이미지 URL 헬퍼 ----------
 export function tmdbImageUrl(path: string | null | undefined, size: 'w185' | 'w342' | 'w500' | 'original' = 'w342'): string | undefined {

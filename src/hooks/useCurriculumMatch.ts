@@ -30,12 +30,20 @@ export function useCurriculumMatch(
       return;
     }
 
+    // 상세 데이터(keywords 또는 synopsis)가 로드되기 전이면 대기
+    const keywords = performance.keywords ?? [];
+    const synopsis = performance.synopsis ?? '';
+    if (keywords.length === 0 && !synopsis) {
+      setState({ data: null, loading: false, error: null });
+      return;
+    }
+
     let cancelled = false;
     setState({ data: null, loading: true, error: null });
 
     matchCurriculum(
-      performance.keywords ?? [],
-      performance.synopsis ?? '',
+      keywords,
+      synopsis,
       activeFilters.length > 0 ? activeFilters : undefined,
     )
       .then(matches => {
