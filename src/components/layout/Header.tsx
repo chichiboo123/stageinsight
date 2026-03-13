@@ -133,13 +133,12 @@ export function Header({ onHomeClick, onInsightClick, insightCount, onSaveJSON, 
           </button>
 
           {/* 사용법 버튼 */}
-          <button className={`btn btn-outline ${styles.helpBtn}`} onClick={onHelpClick} title="사용법 안내">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button className={styles.iconBtn} onClick={onHelpClick} title="사용법 안내" aria-label="사용법 안내">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
               <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
-            <span>사용법</span>
           </button>
         </div>
       </div>

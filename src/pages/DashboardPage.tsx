@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { usePerformances, usePerformanceDetail } from '../hooks/usePerformances';
 import { useCurriculumMatch } from '../hooks/useCurriculumMatch';
@@ -182,6 +182,12 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [gradeFilter, setGradeFilter] = useState<string[]>([]);
+  const [subjectFilter, setSubjectFilter] = useState<string[]>([]);
+
+  // 공연 변경 시 학년군·교과 필터 초기화
+  useEffect(() => { setGradeFilter([]); setSubjectFilter([]); }, [selectedPerformance?.id]);
+
 
   // 공연 목록
   const { performances, loading: perfLoading, error: perfError } = usePerformances(selectedVenue);
@@ -195,6 +201,17 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
 
   // 교육과정 매칭 (상세 데이터 기준 — synopsis·keywords 활용)
   const { matches, loading: currLoading, activeFilters, setFilters } = useCurriculumMatch(displayPerformance);
+
+  // 학년군·교과 필터 옵션 (매칭 결과에서 동적 추출)
+  const availableGrades = useMemo(() => [...new Set(matches.map(m => m.standard.grade))].sort(), [matches]);
+  const availableSubjects = useMemo(() => [...new Set(matches.map(m => m.standard.subject))].sort(), [matches]);
+
+  // 학년군·교과 필터 적용
+  const displayedMatches = useMemo(() => matches.filter(m => {
+    const gradeOk = gradeFilter.length === 0 || gradeFilter.includes(m.standard.grade);
+    const subjectOk = subjectFilter.length === 0 || subjectFilter.includes(m.standard.subject);
+    return gradeOk && subjectOk;
+  }), [matches, gradeFilter, subjectFilter]);
 
   // 연계 미디어 (영화 + 도서) — 상세 데이터(keywords 포함) 기반으로 실행
   const {
@@ -397,14 +414,58 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   </div>
                 </div>
 
+                {/* 학년군 필터 */}
+                {availableGrades.length > 0 && (
+                  <div className={styles.filterBtns}>
+                    {availableGrades.map(grade => (
+                      <button
+                        key={grade}
+                        className={`btn ${gradeFilter.includes(grade) ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setGradeFilter(
+                          gradeFilter.includes(grade)
+                            ? gradeFilter.filter(g => g !== grade)
+                            : [...gradeFilter, grade]
+                        )}
+                        style={{ padding: '5px 12px', fontSize: '11px' }}
+                      >
+                        {grade}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* 교과 필터 */}
+                {availableSubjects.length > 0 && (
+                  <div className={styles.filterBtns}>
+                    {availableSubjects.map(subject => (
+                      <button
+                        key={subject}
+                        className={`btn ${subjectFilter.includes(subject) ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setSubjectFilter(
+                          subjectFilter.includes(subject)
+                            ? subjectFilter.filter(s => s !== subject)
+                            : [...subjectFilter, subject]
+                        )}
+                        style={{ padding: '5px 12px', fontSize: '11px' }}
+                      >
+                        {subject}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {currLoading && <LoadingSpinner size="sm" />}
 
-                {!currLoading && matches.length === 0 && (
-                  <p className={styles.emptyText}>매칭된 성취기준이 없습니다. 키워드를 확인해 주세요.</p>
+                {!currLoading && displayedMatches.length === 0 && (
+                  <p className={styles.emptyText}>
+                    {matches.length === 0
+                      ? '매칭된 성취기준이 없습니다. 키워드를 확인해 주세요.'
+                      : '선택한 필터 조건에 맞는 성취기준이 없습니다.'}
+                  </p>
                 )}
 
                 <div className={styles.standardGrid}>
-                  {matches.map(({ standard, matchedKeywords }) => (
+                  {displayedMatches.map(({ standard, matchedKeywords }) => (
                     <div key={standard.id} className={`card ${styles.standardCard}`}>
                       <div className={styles.standardMeta}>
                         <div className={styles.standardTags}>
