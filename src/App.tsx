@@ -47,14 +47,21 @@ function AppInner() {
     const shareParam = params.get('share');
     if (shareParam) {
       try {
-        const decoded = JSON.parse(atob(shareParam)) as InsightBoard;
+        // 한글 포함: encodeURIComponent → btoa 방식 디코딩
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(shareParam)))) as InsightBoard;
         if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
           loadInsightBoard(decoded);
         }
-      } catch { /* invalid share data */ }
-      // URL에서 share 파라미터 제거
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+      } catch {
+        // 구버전 단순 btoa 방식 fallback
+        try {
+          const decoded = JSON.parse(atob(shareParam)) as InsightBoard;
+          if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
+            loadInsightBoard(decoded);
+          }
+        } catch { /* invalid share data */ }
+      }
+      window.history.replaceState({}, '', window.location.pathname);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,7 +91,7 @@ function AppInner() {
   // ── 네비게이션 핸들러 ──
   function handleSchoolSelect(school: School) {
     selectSchool(school);
-    navigateTo('map');
+    // 홈 페이지에서 공연장 목록이 바로 표시되므로 페이지 전환 없음
   }
 
   function handleVenueSelect(venue: Venue) {
@@ -151,7 +158,7 @@ function AppInner() {
       />
 
       <div style={{ flex: 1 }}>
-        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} />}
+        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} onVenueSelect={handleVenueSelect} />}
         {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
         {page === 'dashboard' && <DashboardPage onGoToMap={handleGoToMap} />}
         {page === 'insight'   && (

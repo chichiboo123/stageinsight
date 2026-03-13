@@ -246,15 +246,15 @@
   color: var(--color-accent-dark);
 }
 
-/* 담기 아이콘 버튼 (공통) */
+/* 담기 아이콘 버튼 (공통) — 항상 우측 하단 고정 표시 */
 .bookmarkBtn {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  bottom: var(--space-3);
+  right: var(--space-3);
   width: 30px;
   height: 30px;
   border-radius: var(--radius-md);
-  background: var(--color-bg-overlay);
+  background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   cursor: pointer;
   color: var(--color-text-muted);
@@ -262,19 +262,16 @@
   align-items: center;
   justify-content: center;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-  opacity: 0;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .bookmarkBtnSm {
   position: absolute;
-  top: var(--space-2);
+  bottom: var(--space-2);
   right: var(--space-2);
   width: 28px;
   height: 28px;
   border-radius: var(--radius-md);
-  background: var(--color-bg-overlay);
+  background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   cursor: pointer;
   color: var(--color-text-muted);
@@ -282,15 +279,6 @@
   align-items: center;
   justify-content: center;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
-  opacity: 0;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-
-.perfDetail:hover .bookmarkBtn,
-.standardCard:hover .bookmarkBtnSm,
-.mediaCard:hover .bookmarkBtnSm {
-  opacity: 1;
 }
 
 .bookmarkBtn:hover,

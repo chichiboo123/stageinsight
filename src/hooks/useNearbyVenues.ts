@@ -15,7 +15,7 @@ interface UseNearbyVenuesReturn extends ApiState<Venue[]> {
 
 export function useNearbyVenues(
   school: School | null,
-  radiusMeters = 5000,
+  radiusMeters = 10000,
 ): UseNearbyVenuesReturn {
   const [state, setState] = useState<ApiState<Venue[]>>({
     data: null,
@@ -40,8 +40,8 @@ export function useNearbyVenues(
 
         if (cancelled) return;
 
-        // 2. 각 공연장까지 경로 정보 병렬 조회 (최대 10개)
-        const top = rawVenues.slice(0, 10);
+        // 2. 각 공연장까지 경로 정보 병렬 조회 (최대 20개)
+        const top = rawVenues.slice(0, 20);
         const routeResults = await Promise.allSettled(
           top.map(v => getRouteInfo(school!.lat, school!.lng, v.lat, v.lng))
         );
@@ -55,7 +55,7 @@ export function useNearbyVenues(
               ...venue,
               distanceMeters: route.value.distanceMeters,
               walkingMinutes: estimateWalkingMinutes(route.value.distanceMeters),
-              transitMinutes: route.value.drivingMinutes,
+              transitMinutes: route.value.drivingMinutes, // 실제: 차량 시간
             };
           }
           return venue;
