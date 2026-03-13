@@ -95,7 +95,11 @@ async function copyToClipboard(board: InsightBoard): Promise<boolean> {
 }
 
 function shareAsUrl(board: InsightBoard): string {
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(board))));
+  // URL-safe base64: +→-, /→_, 패딩(=) 제거 → URL 인코딩 불필요
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(board))))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
   return `${window.location.origin}${window.location.pathname}?share=${encoded}`;
 }
 
@@ -252,7 +256,7 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
 
 // ---------- 메인 컴포넌트 ----------
 export function InsightPage({ onBack }: InsightPageProps) {
-  const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo } = useApp();
+  const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo, clearInsightBoard } = useApp();
   const { insightBoard } = state;
 
   const [newMemo, setNewMemo] = useState('');
@@ -346,6 +350,21 @@ export function InsightPage({ onBack }: InsightPageProps) {
         <div className={styles.exportSection}>
           <span className={styles.exportLabel}>내보내기</span>
           <div className={styles.exportBtns}>
+            <button
+              className={`btn btn-outline ${styles.exportBtn}`}
+              style={{ color: 'var(--color-accent-primary)', borderColor: 'currentColor' }}
+              onClick={() => {
+                if (window.confirm('바구니에 담긴 모든 항목과 메모가 삭제됩니다. 계속하시겠습니까?')) {
+                  clearInsightBoard();
+                }
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+              바구니 비우기
+            </button>
             <button className={`btn btn-outline ${styles.exportBtn}`} onClick={() => exportAsImage(insightBoard)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
