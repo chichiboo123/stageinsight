@@ -254,6 +254,29 @@
   flex-shrink: 0;
 }
 
+/* 공연 없는 공연장 — 회색 처리 */
+.venueCardEmpty {
+  background: var(--color-bg-secondary) !important;
+  border-color: var(--color-border) !important;
+  opacity: 0.72;
+}
+.venueCardEmpty:hover {
+  border-color: var(--color-border) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.venueCardEmpty .venueName {
+  color: var(--color-text-secondary);
+}
+.venueCardEmpty .venueCardIcon {
+  filter: grayscale(1);
+}
+
+.badgeEmpty {
+  background: var(--color-bg-tertiary, #e5e7eb);
+  color: var(--color-text-muted);
+}
+
 /* 기능 소개 */
 .features {
   display: grid;

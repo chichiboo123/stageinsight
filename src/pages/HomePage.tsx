@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { SearchBar } from '../components/common/SearchBar';
 import { useSchoolSearch } from '../hooks/useSchoolSearch';
 import { useNearbyVenues } from '../hooks/useNearbyVenues';
+import { fetchPerformancesByVenue } from '../services/kopis';
 import type { School, Venue } from '../types';
 import styles from './HomePage.module.css';
 
@@ -14,6 +16,26 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
   const { state } = useApp();
   const { query, setQuery, schools, loading, error, clearResults } = useSchoolSearch();
   const { venues, loading: venueLoading } = useNearbyVenues(state.selectedSchool, 10000);
+
+  // 공연 보유 여부: Map<venueId, boolean> — undefined = 아직 로딩 중
+  const [perfStatus, setPerfStatus] = useState<Map<string, boolean>>(new Map());
+
+  useEffect(() => {
+    if (venues.length === 0) { setPerfStatus(new Map()); return; }
+    let cancelled = false;
+    setPerfStatus(new Map()); // 새 목록이면 초기화
+    Promise.allSettled(
+      venues.map(v =>
+        fetchPerformancesByVenue(v.name).then(perfs => ({ id: v.id, has: perfs.length > 0 }))
+      )
+    ).then(results => {
+      if (cancelled) return;
+      const map = new Map<string, boolean>();
+      results.forEach(r => { if (r.status === 'fulfilled') map.set(r.value.id, r.value.has); });
+      setPerfStatus(map);
+    });
+    return () => { cancelled = true; };
+  }, [venues]);
 
   function handleSchoolSelect(school: School) {
     clearResults();
@@ -110,39 +132,47 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
             <>
               <p className={styles.venueCount}>총 {venues.length}곳 검색됨</p>
               <div className={styles.venueGrid}>
-                {venues.map(venue => (
-                  <button
-                    key={venue.id}
-                    className={`card ${styles.venueCard}`}
-                    onClick={() => onVenueSelect(venue)}
-                  >
-                    <div className={styles.venueCardIcon}>🎪</div>
-                    <div className={styles.venueCardBody}>
-                      <strong className={styles.venueName}>{venue.name}</strong>
-                      <small className={styles.venueAddress}>{venue.address}</small>
-                      <div className={styles.venueBadges}>
-                        {venue.walkingMinutes != null && (
-                          <span className={`tag ${styles.badgeWalk}`}>
-                            🚶 {venue.walkingMinutes}분
-                          </span>
-                        )}
-                        {venue.transitMinutes != null && (
-                          <span className={`tag ${styles.badgeCar}`}>
-                            🚗 {venue.transitMinutes}분
-                          </span>
-                        )}
-                        {venue.distanceMeters != null && (
-                          <span className="tag">
-                            {venue.distanceMeters >= 1000
-                              ? `${(venue.distanceMeters / 1000).toFixed(1)}km`
-                              : `${Math.round(venue.distanceMeters)}m`}
-                          </span>
-                        )}
+                {venues.map(venue => {
+                  const hasPerf = perfStatus.get(venue.id);  // undefined = 로딩 중, true/false = 확정
+                  const isEmpty = hasPerf === false;
+                  return (
+                    <button
+                      key={venue.id}
+                      className={`card ${styles.venueCard} ${isEmpty ? styles.venueCardEmpty : ''}`}
+                      onClick={() => onVenueSelect(venue)}
+                      title={isEmpty ? '현재 공연 예정 작품이 없습니다' : undefined}
+                    >
+                      <div className={styles.venueCardIcon}>{isEmpty ? '🎭' : '🎪'}</div>
+                      <div className={styles.venueCardBody}>
+                        <strong className={styles.venueName}>{venue.name}</strong>
+                        <small className={styles.venueAddress}>{venue.address}</small>
+                        <div className={styles.venueBadges}>
+                          {venue.walkingMinutes != null && (
+                            <span className={`tag ${isEmpty ? '' : styles.badgeWalk}`}>
+                              🚶 {venue.walkingMinutes}분
+                            </span>
+                          )}
+                          {venue.transitMinutes != null && (
+                            <span className={`tag ${isEmpty ? '' : styles.badgeCar}`}>
+                              🚗 {venue.transitMinutes}분
+                            </span>
+                          )}
+                          {venue.distanceMeters != null && (
+                            <span className="tag">
+                              {venue.distanceMeters >= 1000
+                                ? `${(venue.distanceMeters / 1000).toFixed(1)}km`
+                                : `${Math.round(venue.distanceMeters)}m`}
+                            </span>
+                          )}
+                          {isEmpty && (
+                            <span className={`tag ${styles.badgeEmpty}`}>공연 없음</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <span className={styles.venueArrow}>›</span>
-                  </button>
-                ))}
+                      <span className={styles.venueArrow}>›</span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
