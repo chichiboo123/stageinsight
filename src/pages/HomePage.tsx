@@ -1,20 +1,26 @@
-
+import { useApp } from '../contexts/AppContext';
 import { SearchBar } from '../components/common/SearchBar';
 import { useSchoolSearch } from '../hooks/useSchoolSearch';
-import type { School } from '../types';
+import { useNearbyVenues } from '../hooks/useNearbyVenues';
+import type { School, Venue } from '../types';
 import styles from './HomePage.module.css';
 
 interface HomePageProps {
   onSchoolSelect: (school: School) => void;
+  onVenueSelect: (venue: Venue) => void;
 }
 
-export function HomePage({ onSchoolSelect }: HomePageProps) {
+export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
+  const { state } = useApp();
   const { query, setQuery, schools, loading, error, clearResults } = useSchoolSearch();
+  const { venues, loading: venueLoading } = useNearbyVenues(state.selectedSchool, 10000);
 
-  function handleSelect(school: School) {
+  function handleSchoolSelect(school: School) {
     clearResults();
     onSchoolSelect(school);
   }
+
+  const hasSchool = !!state.selectedSchool;
 
   return (
     <main className={styles.main}>
@@ -26,8 +32,7 @@ export function HomePage({ onSchoolSelect }: HomePageProps) {
             <span className={styles.heroAccent}>연결하다</span>
           </h1>
           <p className={styles.heroSubtitle}>
-            학교명을 검색하면 주변 공연장과 진행 중인 공연을 찾아드립니다.<br />
-            교육과정 성취기준과 연계해 융합 수업 아이디어를 구상해 보세요.
+            학교명 → 공연장 → 작품 → 교육과정 연계
           </p>
 
           {/* 검색창 */}
@@ -44,16 +49,12 @@ export function HomePage({ onSchoolSelect }: HomePageProps) {
             {/* 자동완성 드롭다운 */}
             {(schools.length > 0 || error) && (
               <div className={styles.dropdown}>
-                {error && (
-                  <div className={styles.dropdownError}>
-                    {error}
-                  </div>
-                )}
+                {error && <div className={styles.dropdownError}>{error}</div>}
                 {schools.map(school => (
                   <button
                     key={school.id}
                     className={styles.dropdownItem}
-                    onClick={() => handleSelect(school)}
+                    onClick={() => handleSchoolSelect(school)}
                   >
                     <span className={styles.schoolIcon}>🏫</span>
                     <span className={styles.schoolInfo}>
@@ -75,17 +76,95 @@ export function HomePage({ onSchoolSelect }: HomePageProps) {
         </div>
       </section>
 
-      {/* 기능 소개 카드 */}
-      <section className={`container ${styles.features}`}>
-        {FEATURES.map((feat, i) => (
-          <div key={i} className={`card ${styles.featureCard} fade-in`}
-            style={{ animationDelay: `${i * 80}ms` }}>
-            <span className={styles.featureIcon}>{feat.icon}</span>
-            <h3 className={styles.featureTitle}>{feat.title}</h3>
-            <p className={styles.featureDesc}>{feat.desc}</p>
+      {/* 학교 선택 후: 주변 공연장 목록 */}
+      {hasSchool && (
+        <section className={`container ${styles.venueSection}`}>
+          <div className={styles.venueSectionHeader}>
+            <h2 className={styles.venueSectionTitle}>
+              📍 {state.selectedSchool!.name} 주변 공연장
+            </h2>
+            <button
+              className="btn btn-ghost"
+              style={{ fontSize: 'var(--font-size-sm)' }}
+              onClick={() => onSchoolSelect(state.selectedSchool!)}
+            >
+              학교 재검색
+            </button>
           </div>
-        ))}
-      </section>
+
+          {venueLoading && (
+            <div className={styles.venueLoading}>
+              <span className={styles.spinner} />
+              <span>공연장 검색 중...</span>
+            </div>
+          )}
+
+          {!venueLoading && venues.length === 0 && (
+            <div className="empty-state">
+              <span style={{ fontSize: '32px' }}>🎭</span>
+              <p>반경 10km 내 공연장을 찾지 못했습니다.</p>
+            </div>
+          )}
+
+          {!venueLoading && venues.length > 0 && (
+            <>
+              <p className={styles.venueCount}>총 {venues.length}곳 검색됨</p>
+              <div className={styles.venueGrid}>
+                {venues.map(venue => (
+                  <button
+                    key={venue.id}
+                    className={`card ${styles.venueCard}`}
+                    onClick={() => onVenueSelect(venue)}
+                  >
+                    <div className={styles.venueCardIcon}>🎪</div>
+                    <div className={styles.venueCardBody}>
+                      <strong className={styles.venueName}>{venue.name}</strong>
+                      <small className={styles.venueAddress}>{venue.address}</small>
+                      <div className={styles.venueBadges}>
+                        {venue.walkingMinutes != null && (
+                          <span className={`tag ${styles.badgeWalk}`}>
+                            🚶 {venue.walkingMinutes}분
+                          </span>
+                        )}
+                        {venue.transitMinutes != null && (
+                          <span className={`tag ${styles.badgeCar}`}>
+                            🚗 {venue.transitMinutes}분
+                          </span>
+                        )}
+                        {venue.distanceMeters != null && (
+                          <span className="tag">
+                            {venue.distanceMeters >= 1000
+                              ? `${(venue.distanceMeters / 1000).toFixed(1)}km`
+                              : `${Math.round(venue.distanceMeters)}m`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={styles.venueArrow}>›</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* 기능 소개 카드 (학교 미선택 시만 표시) */}
+      {!hasSchool && (
+        <section className={`container ${styles.features}`}>
+          {FEATURES.map((feat, i) => (
+            <div
+              key={i}
+              className={`card ${styles.featureCard} fade-in`}
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <span className={styles.featureIcon}>{feat.icon}</span>
+              <h3 className={styles.featureTitle}>{feat.title}</h3>
+              <p className={styles.featureDesc}>{feat.desc}</p>
+            </div>
+          ))}
+        </section>
+      )}
     </main>
   );
 }
@@ -94,21 +173,21 @@ const FEATURES = [
   {
     icon: '🗺️',
     title: '공연장 탐색',
-    desc: '학교 반경 내 도보·대중교통으로 이동 가능한 공연장을 지도에서 확인하세요.',
+    desc: '학교 주변 공연장 찾기',
   },
   {
     icon: '🎭',
     title: '공연 정보',
-    desc: 'KOPIS 연계로 현재 공연 중이거나 예정된 작품의 포스터, 줄거리, 출연진을 제공합니다.',
+    desc: 'KOPIS 공연 정보 제공',
   },
   {
     icon: '📚',
     title: '교육과정 연계',
-    desc: '2022 개정·2019 누리·2022 특수 교육과정 성취기준을 자동으로 매칭해 드립니다.',
+    desc: '최신 성취기준 자동 매칭',
   },
   {
     icon: '🎬',
     title: '예술의 확장',
-    desc: '공연과 연계된 영화(TMDB)와 추천 도서(네이버북)로 심화 학습을 설계하세요.',
+    desc: '영화·독서 등 융합 수업 아이디어 제공',
   },
 ];

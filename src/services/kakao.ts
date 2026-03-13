@@ -49,70 +49,102 @@ interface KakaoRouteResponse {
   }>;
 }
 
-// ---------- 학교 검색 ----------
+// ---------- 학교 검색 (SC4 + 유치원 병렬) ----------
 export async function searchSchools(query: string): Promise<School[]> {
   if (!query.trim()) return [];
 
-  const params = new URLSearchParams({
-    query,
-    category_group_code: 'SC4', // 학교
-    size: '10',
-  });
-
-  const res = await fetch(`${BASE_URL}/search/keyword.json?${params}`, {
-    headers: authHeader(),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`카카오 학교 검색 실패: ${err?.message ?? res.statusText}`);
-  }
-
-  const data: KakaoSearchResponse = await res.json();
-  return data.documents.map(doc => ({
+  const toSchool = (doc: KakaoDocument): School => ({
     id: doc.id,
     name: doc.place_name,
     address: doc.road_address_name || doc.address_name,
     lat: parseFloat(doc.y),
     lng: parseFloat(doc.x),
-  }));
+  });
+
+  // SC4(학교) 검색
+  const p1 = new URLSearchParams({ query, category_group_code: 'SC4', size: '10' });
+  // 카테고리 없이 유치원 포함 전체 검색 (유치원은 SC4 미분류 가능)
+  const p2 = new URLSearchParams({ query, size: '10' });
+
+  const [r1, r2] = await Promise.allSettled([
+    fetch(`${BASE_URL}/search/keyword.json?${p1}`, { headers: authHeader() }),
+    fetch(`${BASE_URL}/search/keyword.json?${p2}`, { headers: authHeader() }),
+  ]);
+
+  const docs: KakaoDocument[] = [];
+  const seen = new Set<string>();
+
+  for (const r of [r1, r2]) {
+    if (r.status !== 'fulfilled' || !r.value.ok) continue;
+    const data: KakaoSearchResponse = await r.value.json();
+    for (const doc of data.documents) {
+      if (!seen.has(doc.id)) {
+        seen.add(doc.id);
+        docs.push(doc);
+      }
+    }
+  }
+
+  if (docs.length === 0) {
+    // 둘 다 실패한 경우
+    throw new Error('카카오 학교 검색 실패: 네트워크 오류');
+  }
+
+  return docs.slice(0, 10).map(toSchool);
 }
 
-// ---------- 반경 내 공연장 검색 ----------
-// KOPIS 연계 전 카카오로 1차 필터: category_group_code CT1 (문화시설)
+// ---------- 반경 내 공연장 검색 (최대 20곳, 2페이지) ----------
 export async function searchNearbyVenues(
   lat: number,
   lng: number,
-  radiusMeters = 5000
+  radiusMeters = 10000
 ): Promise<Venue[]> {
-  const params = new URLSearchParams({
+  const baseParams = {
     query: '공연장',
     category_group_code: 'CT1',
     x: String(lng),
     y: String(lat),
-    radius: String(radiusMeters),
+    radius: String(Math.min(radiusMeters, 20000)), // 카카오 최대 20km
     sort: 'distance',
     size: '15',
-  });
+  };
 
-  const res = await fetch(`${BASE_URL}/search/keyword.json?${params}`, {
-    headers: authHeader(),
-  });
+  const p1 = new URLSearchParams({ ...baseParams, page: '1' });
+  const p2 = new URLSearchParams({ ...baseParams, page: '2' });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`주변 공연장 검색 실패: ${err?.message ?? res.statusText}`);
-  }
+  const [r1, r2] = await Promise.allSettled([
+    fetch(`${BASE_URL}/search/keyword.json?${p1}`, { headers: authHeader() }),
+    fetch(`${BASE_URL}/search/keyword.json?${p2}`, { headers: authHeader() }),
+  ]);
 
-  const data: KakaoSearchResponse = await res.json();
-  return data.documents.map(doc => ({
+  const toVenue = (doc: KakaoDocument): Venue => ({
     id: doc.id,
     name: doc.place_name,
     address: doc.road_address_name || doc.address_name,
     lat: parseFloat(doc.y),
     lng: parseFloat(doc.x),
     phone: doc.phone || undefined,
-  }));
+  });
+
+  const docs: KakaoDocument[] = [];
+  const seen = new Set<string>();
+
+  for (const r of [r1, r2]) {
+    if (r.status !== 'fulfilled' || !r.value.ok) continue;
+    const data: KakaoSearchResponse = await r.value.json();
+    for (const doc of data.documents) {
+      if (!seen.has(doc.id)) {
+        seen.add(doc.id);
+        docs.push(doc);
+      }
+    }
+  }
+
+  if (docs.length === 0 && r1.status === 'rejected') {
+    throw new Error('주변 공연장 검색 실패: 네트워크 오류');
+  }
+
+  return docs.slice(0, 20).map(toVenue);
 }
 
 // ---------- 두 지점 경로 소요시간 (자동차 기준 / 대중교통 fallback) ----------
