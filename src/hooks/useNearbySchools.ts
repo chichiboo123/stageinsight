@@ -15,8 +15,15 @@ export interface SchoolWithDistance extends School {
   transitMinutes?: number;
 }
 
+export interface VenueGeoInfo {
+  lat: number;
+  lng: number;
+  address: string;
+}
+
 interface UseNearbySchoolsReturn extends ApiState<SchoolWithDistance[]> {
   schools: SchoolWithDistance[];
+  venueInfo: VenueGeoInfo | null;
 }
 
 export function useNearbySchools(
@@ -27,20 +34,24 @@ export function useNearbySchools(
   const [state, setState] = useState<ApiState<SchoolWithDistance[]>>({
     data: null, loading: false, error: null,
   });
+  const [venueInfo, setVenueInfo] = useState<VenueGeoInfo | null>(null);
 
   useEffect(() => {
     if (!venueId && !venueName) {
       setState({ data: null, loading: false, error: null });
+      setVenueInfo(null);
       return;
     }
 
     let cancelled = false;
     setState({ data: null, loading: true, error: null });
+    setVenueInfo(null);
 
     async function run() {
       try {
         let lat: number | undefined;
         let lng: number | undefined;
+        let venueAddress = '';
 
         // 1. KOPIS 공연장 상세로 좌표 획득
         if (venueId) {
@@ -50,6 +61,7 @@ export function useNearbySchools(
           if (detail.lat && detail.lng && detail.lat !== 0 && detail.lng !== 0) {
             lat = detail.lat;
             lng = detail.lng;
+            venueAddress = detail.address ?? '';
           }
         }
 
@@ -60,10 +72,23 @@ export function useNearbySchools(
           if (geo) { lat = geo.lat; lng = geo.lng; }
         }
 
+        // 3. 괄호 포함 공연장명 지오코딩 실패 시 괄호 제거 후 재시도
+        //    예: "노원어린이극장 (구.노원어울림극장)" → "노원어린이극장"
+        if ((!lat || !lng) && venueName) {
+          const simplified = venueName.replace(/\s*[(\[（【][^)\]）】]*[)\]）】]/g, '').trim();
+          if (simplified && simplified !== venueName) {
+            const geo = await geocodeKeyword(simplified);
+            if (cancelled) return;
+            if (geo) { lat = geo.lat; lng = geo.lng; }
+          }
+        }
+
         if (!lat || !lng) {
           setState({ data: [], loading: false, error: null });
           return;
         }
+
+        setVenueInfo({ lat, lng, address: venueAddress });
 
         // 3. 카카오로 주변 학교 검색
         const rawSchools = await searchNearbySchools(lat, lng, radiusMeters);
@@ -109,5 +134,6 @@ export function useNearbySchools(
     loading: state.loading,
     error: state.error,
     data: state.data,
+    venueInfo,
   };
 }

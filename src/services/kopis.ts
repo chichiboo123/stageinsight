@@ -30,6 +30,14 @@ function mapState(prfstate: string): PerformanceState {
   return '공연완료';
 }
 
+// ---------- 공연장명 정규화 (괄호 제거 + 공백 제거 + 소문자) ----------
+function normalizeVenueName(name: string): string {
+  return name
+    .replace(/\s*[(\[（【][^)\]）】]*[)\]）】]/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
 // ---------- 공연장 목록 조회 ----------
 // KOPIS는 공연장 ID(fcltyCd)를 기반으로 공연 조회
 export async function fetchPerformancesByVenue(
@@ -58,9 +66,11 @@ export async function fetchPerformancesByVenue(
   const xml = await res.text();
   const all = parsePerformanceListXml(xml);
 
-  // 공연완료 제외, 공연중 → 공연예정 순으로 정렬
+  // 공연완료 제외 + 공연장명 정규화 일치 필터 (다른 도시 동명 공연장 제외)
+  const normTarget = normalizeVenueName(venueName);
   return all
     .filter(p => p.state !== '공연완료')
+    .filter(p => normalizeVenueName(p.venue) === normTarget)
     .sort((a, b) => {
       const order: Record<string, number> = { '공연중': 0, '공연예정': 1 };
       return (order[a.state] ?? 2) - (order[b.state] ?? 2);

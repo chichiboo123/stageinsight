@@ -100,27 +100,40 @@ export async function searchMoviesByKeywords(keywords: string[], title?: string)
     .map(item => mapTMDB(item, genreMap));
 }
 
+// ---------- 제목에서 개별 검색어 추출 ----------
+// e.g. "삼양동화: 헨젤과 새엄마 & 신데렐라" → ["삼양동화", "헨젤과 새엄마", "신데렐라"]
+function extractTitleTerms(title: string): string[] {
+  return [...new Set(
+    title
+      .split(/[&:·\-|／]|&amp;/)
+      .map(p => p.trim())
+      .filter(p => p.length >= 2)
+  )];
+}
+
 // ---------- 공연 제목으로 연관 영화 추천 ----------
 export async function recommendMoviesForPerformance(
   performanceTitle: string,
   keywords: string[] = [],
 ): Promise<Movie[]> {
-  // 1차: 공연 제목으로 검색
+  const titleTerms = extractTitleTerms(performanceTitle);
+
+  // 1차: 공연 제목 및 부제 각각 검색
   // 2차: 키워드로 검색
   // 중복 제거 후 상위 20개 반환
-  const [byTitle, byKeywords] = await Promise.all([
-    searchMoviesByKeywords([], performanceTitle).catch(() => [] as Movie[]),
+  const searchPromises = [
+    ...titleTerms.map(t => searchMoviesByKeywords([], t).catch(() => [] as Movie[])),
     keywords.length > 0
       ? searchMoviesByKeywords(keywords).catch(() => [] as Movie[])
       : Promise.resolve([] as Movie[]),
-  ]);
+  ];
 
+  const results = await Promise.all(searchPromises);
   const seen = new Set<number>();
   const merged: Movie[] = [];
-  for (const m of [...byTitle, ...byKeywords]) {
-    if (!seen.has(m.id)) {
-      seen.add(m.id);
-      merged.push(m);
+  for (const batch of results) {
+    for (const m of batch) {
+      if (!seen.has(m.id)) { seen.add(m.id); merged.push(m); }
     }
   }
   return merged.slice(0, 20);
