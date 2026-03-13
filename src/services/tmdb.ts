@@ -67,6 +67,20 @@ function mapTMDB(item: TMDBMovie, genreMap: Record<number, string>): Movie {
   };
 }
 
+// ---------- 종교 콘텐츠 필터 ----------
+const RELIGIOUS_KEYWORDS = [
+  '종교', '신앙', '신격', '신성', '신학', '교리', '경전', '예배', '기도', '찬양',
+  '성지', '성물', '구원', '천국', '지옥', '영혼', '영적', '영성', '교회', '성당',
+  '사원', '성전', '수도원', '성직자', '목사', '신부', '수녀', '스님', '승려', '교황',
+  '주교', '미사', '법회', '설교', '찬송', '선교', '포교', '기독교', '천주교',
+  '개신교', '불교', '이슬람', '힌두교', '유대교',
+];
+
+function isReligiousMovie(movie: TMDBMovie): boolean {
+  const text = `${movie.title} ${movie.original_title} ${movie.overview}`.toLowerCase();
+  return RELIGIOUS_KEYWORDS.some(kw => text.includes(kw));
+}
+
 // ---------- 키워드 기반 영화 검색 ----------
 export async function searchMoviesByKeywords(keywords: string[], title?: string): Promise<Movie[]> {
   const query = [title, ...keywords].filter(Boolean).join(' ');
@@ -81,6 +95,7 @@ export async function searchMoviesByKeywords(keywords: string[], title?: string)
 
   const data: TMDBSearchResponse = await searchRes.json();
   return data.results
+    .filter(item => !isReligiousMovie(item))
     .slice(0, 20)
     .map(item => mapTMDB(item, genreMap));
 }

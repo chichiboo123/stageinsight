@@ -52,6 +52,16 @@ function mapNaverBook(item: NaverBookItem): Book {
   };
 }
 
+// ---------- 종교 콘텐츠 필터 ----------
+const RELIGIOUS_KEYWORDS = [
+  '종교', '신앙', '신격', '신성', '신학', '교리', '경전', '예배', '기도', '찬양',
+  '성지', '성물', '구원', '천국', '지옥', '영혼', '영적', '영성', '교회', '성당',
+  '사원', '성전', '수도원', '성직자', '목사', '신부', '수녀', '스님', '승려', '교황',
+  '주교', '미사', '법회', '설교', '찬송', '선교', '포교', '기독교', '천주교',
+  '개신교', '불교', '이슬람', '힌두교', '유대교',
+];
+
+
 // ---------- 도서 검색 ----------
 export async function searchBooks(query: string, display = 10): Promise<Book[]> {
   if (!query.trim()) return [];
@@ -99,5 +109,10 @@ export async function recommendBooksForPerformance(
       }
     }
   }
-  return merged.slice(0, 20);
+
+  // 종교 관련 도서 제외
+  return merged.filter(book => {
+    const text = `${book.title} ${book.description} ${book.author} ${book.publisher}`.toLowerCase();
+    return !RELIGIOUS_KEYWORDS.some(kw => text.includes(kw));
+  }).slice(0, 20);
 }
