@@ -147,6 +147,53 @@ export async function searchNearbyVenues(
   return docs.slice(0, 20).map(toVenue);
 }
 
+// ---------- 반경 내 학교 검색 (SC4) ----------
+export async function searchNearbySchools(
+  lat: number,
+  lng: number,
+  radiusMeters = 5000,
+): Promise<School[]> {
+  const baseParams = {
+    query: '학교',
+    category_group_code: 'SC4',
+    x: String(lng),
+    y: String(lat),
+    radius: String(Math.min(radiusMeters, 20000)),
+    sort: 'distance',
+    size: '15',
+  };
+
+  const p1 = new URLSearchParams({ ...baseParams, page: '1' });
+  const p2 = new URLSearchParams({ ...baseParams, page: '2' });
+
+  const [r1, r2] = await Promise.allSettled([
+    fetch(`${BASE_URL}/search/keyword.json?${p1}`, { headers: authHeader() }),
+    fetch(`${BASE_URL}/search/keyword.json?${p2}`, { headers: authHeader() }),
+  ]);
+
+  const docs: KakaoDocument[] = [];
+  const seen = new Set<string>();
+
+  for (const r of [r1, r2]) {
+    if (r.status !== 'fulfilled' || !r.value.ok) continue;
+    const data: KakaoSearchResponse = await r.value.json();
+    for (const doc of data.documents) {
+      if (!seen.has(doc.id)) {
+        seen.add(doc.id);
+        docs.push(doc);
+      }
+    }
+  }
+
+  return docs.slice(0, 20).map(doc => ({
+    id: doc.id,
+    name: doc.place_name,
+    address: doc.road_address_name || doc.address_name,
+    lat: parseFloat(doc.y),
+    lng: parseFloat(doc.x),
+  }));
+}
+
 // ---------- 두 지점 경로 소요시간 (자동차 기준 / 대중교통 fallback) ----------
 export async function getRouteInfo(
   originLat: number,

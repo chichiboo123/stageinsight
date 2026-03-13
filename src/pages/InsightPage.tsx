@@ -361,22 +361,42 @@ export function InsightPage({ onBack }: InsightPageProps) {
   return (
     <div className={`container ${styles.page}`}>
       <div className={styles.pageHeader}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          {onBack && (
-            <button className="btn btn-ghost" onClick={onBack} style={{ flexShrink: 0 }}>
-              ← 뒤로가기
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            {onBack && (
+              <button className="btn btn-ghost" onClick={onBack} style={{ flexShrink: 0 }}>
+                ← 뒤로가기
+              </button>
+            )}
+            <h1 className={styles.title}>🛒 인사이트 바구니</h1>
+            {totalCount > 0 && (
+              <span className="tag" style={{ fontSize: '11px' }}>
+                총 {totalCount}개
+              </span>
+            )}
+          </div>
+          {!isEmpty && (
+            <button
+              className={`btn btn-ghost ${styles.clearBtn}`}
+              title="바구니 비우기"
+              onClick={() => {
+                if (window.confirm('바구니에 담긴 모든 항목과 메모가 삭제됩니다. 계속하시겠습니까?')) {
+                  clearInsightBoard();
+                }
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+                <path d="M9 6V4h6v2"/>
+              </svg>
             </button>
           )}
-          <h1 className={styles.title}>🛒 인사이트 바구니</h1>
         </div>
         <p className={styles.subtitle}>
           공연 작품 · 성취기준 · 미디어 · 메모가 공연별로 함께 관리됩니다.
         </p>
-        {totalCount > 0 && (
-          <span className="tag" style={{ alignSelf: 'flex-start' }}>
-            총 {totalCount}개
-          </span>
-        )}
       </div>
 
       {/* 내보내기 버튼 */}
@@ -384,21 +404,6 @@ export function InsightPage({ onBack }: InsightPageProps) {
         <div className={styles.exportSection}>
           <span className={styles.exportLabel}>내보내기</span>
           <div className={styles.exportBtns}>
-            <button
-              className={`btn btn-outline ${styles.exportBtn}`}
-              style={{ color: 'var(--color-accent-primary)', borderColor: 'currentColor' }}
-              onClick={() => {
-                if (window.confirm('바구니에 담긴 모든 항목과 메모가 삭제됩니다. 계속하시겠습니까?')) {
-                  clearInsightBoard();
-                }
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-              </svg>
-              바구니 비우기
-            </button>
             <button className={`btn btn-outline ${styles.exportBtn}`} onClick={() => exportAsImage(insightBoard)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
