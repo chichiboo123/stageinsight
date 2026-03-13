@@ -43,7 +43,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
   // ── 작품 모드 (역방향) ──
   const { query: perfQuery, setQuery: setPerfQuery, performances, loading: perfLoading, error: perfError, clearResults: clearPerfResults } = usePerformanceSearch();
   const [selectedPerf, setSelectedPerf] = useState<Performance | null>(null);
-  const { schools: nearbySchools, loading: schoolsLoading } = useNearbySchools(
+  const { schools: nearbySchools, loading: schoolsLoading, venueInfo } = useNearbySchools(
     selectedPerf?.venueId ?? null,
     selectedPerf?.venue ?? null,
     10000,
@@ -68,9 +68,22 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
   }
 
   function handleReverseSchoolSelect(school: School) {
-    setMode('school');
-    setSelectedPerf(null);
     onSchoolSelect(school);
+    if (selectedPerf && venueInfo) {
+      // 공연장 선택 단계를 건너뛰고 바로 대시보드로 이동
+      const syntheticVenue: Venue = {
+        id: selectedPerf.venueId,
+        name: selectedPerf.venue,
+        address: venueInfo.address || selectedPerf.venue,
+        lat: venueInfo.lat,
+        lng: venueInfo.lng,
+      };
+      onVenueSelect(syntheticVenue);
+    } else {
+      // venueInfo 없으면 학교 선택 모드로 폴백
+      setMode('school');
+      setSelectedPerf(null);
+    }
   }
 
   const hasSchool = !!state.selectedSchool;

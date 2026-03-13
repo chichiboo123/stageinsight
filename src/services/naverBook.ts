@@ -85,12 +85,24 @@ export async function searchBooks(query: string, display = 10): Promise<Book[]> 
   return data.items.map(mapNaverBook);
 }
 
+// ---------- 제목에서 개별 검색어 추출 ----------
+function extractTitleTerms(title: string): string[] {
+  return [...new Set(
+    title
+      .split(/[&:·\-|／]|&amp;/)
+      .map(p => p.trim())
+      .filter(p => p.length >= 2)
+  )];
+}
+
 // ---------- 공연 연계 도서 추천 ----------
 export async function recommendBooksForPerformance(
   performanceTitle: string,
   keywords: string[] = [],
 ): Promise<Book[]> {
-  const queries = [performanceTitle, ...keywords].slice(0, 4);
+  const titleTerms = extractTitleTerms(performanceTitle);
+  // 제목 전체 + 부제 각각 + 키워드 순으로, 중복 제거, 최대 6개 쿼리
+  const queries = [...new Set([performanceTitle, ...titleTerms, ...keywords])].slice(0, 6);
 
   const results = await Promise.allSettled(
     queries.map(q => searchBooks(q, 10))
