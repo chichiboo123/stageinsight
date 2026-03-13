@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import type { InsightBoard, InsightItem, InsightMemo } from '../types';
 import styles from './InsightPage.module.css';
@@ -256,7 +256,7 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
 
 // ---------- 메인 컴포넌트 ----------
 export function InsightPage({ onBack }: InsightPageProps) {
-  const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo, clearInsightBoard } = useApp();
+  const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo, clearInsightBoard, reorderInsightItems } = useApp();
   const { insightBoard } = state;
 
   const [newMemo, setNewMemo] = useState('');
@@ -268,6 +268,40 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const [selectedItem, setSelectedItem] = useState<InsightItem | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── 드래그 앤 드롭 ──
+  const dragId = useRef<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
+    dragId.current = id;
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== dragId.current) setDragOverId(id);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!dragId.current || dragId.current === targetId) { setDragOverId(null); return; }
+    const items = [...insightBoard.items];
+    const fromIdx = items.findIndex(i => i.id === dragId.current);
+    const toIdx = items.findIndex(i => i.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) { setDragOverId(null); return; }
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    reorderInsightItems(items);
+    dragId.current = null;
+    setDragOverId(null);
+  }, [insightBoard.items, reorderInsightItems]);
+
+  const handleDragEnd = useCallback(() => {
+    dragId.current = null;
+    setDragOverId(null);
+  }, []);
 
   // 담긴 공연 목록 (고유)
   const linkedPerformances = useMemo(() => {
@@ -425,10 +459,18 @@ export function InsightPage({ onBack }: InsightPageProps) {
                       {group.items.map((item: InsightItem) => (
                         <div
                           key={item.id}
-                          className={`card ${styles.insightItem}`}
-                          style={{ cursor: 'pointer' }}
+                          className={`card ${styles.insightItem} ${dragOverId === item.id ? styles.dragOver : ''}`}
+                          draggable
+                          onDragStart={e => handleDragStart(e, item.id)}
+                          onDragOver={e => handleDragOver(e, item.id)}
+                          onDrop={e => handleDrop(e, item.id)}
+                          onDragEnd={handleDragEnd}
                           onClick={() => setSelectedItem(item)}
                         >
+                          {/* 드래그 핸들 */}
+                          <span className={styles.dragHandle} title="드래그하여 순서 변경" onClick={e => e.stopPropagation()}>
+                            ⠿
+                          </span>
                           {item.thumbnail && (
                             <img src={item.thumbnail} alt={item.title} className={styles.itemThumbnail} />
                           )}

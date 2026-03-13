@@ -26,7 +26,8 @@ type AppAction =
   | { type: 'UPDATE_INSIGHT_MEMO'; payload: InsightMemo }
   | { type: 'DELETE_INSIGHT_MEMO'; payload: string }
   | { type: 'LOAD_INSIGHT_BOARD'; payload: InsightBoard }
-  | { type: 'CLEAR_INSIGHT_BOARD' };
+  | { type: 'CLEAR_INSIGHT_BOARD' }
+  | { type: 'REORDER_INSIGHT_ITEMS'; payload: InsightItem[] };
 
 // ---------- 초기 상태 ----------
 const INSIGHT_STORAGE_KEY = 'stageinsight-board';
@@ -114,6 +115,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
       saveBoard(empty);
       return { ...state, insightBoard: empty };
     }
+    case 'REORDER_INSIGHT_ITEMS': {
+      const updated = { ...state.insightBoard, items: action.payload };
+      saveBoard(updated);
+      return { ...state, insightBoard: updated };
+    }
 
     default:
       return state;
@@ -149,6 +155,7 @@ interface AppContextValue {
   deleteInsightMemo: (id: string) => void;
   loadInsightBoard: (board: InsightBoard) => void;
   clearInsightBoard: () => void;
+  reorderInsightItems: (items: InsightItem[]) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -199,6 +206,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const clearInsightBoard = useCallback(() =>
     dispatch({ type: 'CLEAR_INSIGHT_BOARD' }), []);
 
+  const reorderInsightItems = useCallback((items: InsightItem[]) =>
+    dispatch({ type: 'REORDER_INSIGHT_ITEMS', payload: items }), []);
+
   return (
     <AppContext.Provider value={{
       state,
@@ -212,6 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteInsightMemo,
       loadInsightBoard,
       clearInsightBoard,
+      reorderInsightItems,
     }}>
       {children}
     </AppContext.Provider>

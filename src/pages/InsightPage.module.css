@@ -111,6 +111,33 @@
   gap: var(--space-2);
   padding: var(--space-3);
   overflow: hidden;
+  cursor: grab;
+  transition: opacity 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.insightItem:active {
+  cursor: grabbing;
+}
+.insightItem.dragOver {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-primary) 30%, transparent);
+}
+
+/* 드래그 핸들 */
+.dragHandle {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-7);
+  font-size: 14px;
+  color: var(--color-text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s;
+  user-select: none;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.insightItem:hover .dragHandle {
+  opacity: 1;
 }
 
 .itemThumbnail {
