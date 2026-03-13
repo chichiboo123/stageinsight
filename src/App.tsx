@@ -47,19 +47,28 @@ function AppInner() {
     const shareParam = params.get('share');
     if (shareParam) {
       try {
-        // 한글 포함: encodeURIComponent → btoa 방식 디코딩
-        const decoded = JSON.parse(decodeURIComponent(escape(atob(shareParam)))) as InsightBoard;
+        // URL-safe base64 복원 (- → +, _ → /) 후 패딩 추가
+        const restored = shareParam.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = restored + '='.repeat((4 - restored.length % 4) % 4);
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(padded)))) as InsightBoard;
         if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
           loadInsightBoard(decoded);
         }
       } catch {
-        // 구버전 단순 btoa 방식 fallback
+        // 구버전 표준 base64 fallback
         try {
-          const decoded = JSON.parse(atob(shareParam)) as InsightBoard;
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(shareParam)))) as InsightBoard;
           if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
             loadInsightBoard(decoded);
           }
-        } catch { /* invalid share data */ }
+        } catch {
+          try {
+            const decoded = JSON.parse(atob(shareParam)) as InsightBoard;
+            if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
+              loadInsightBoard(decoded);
+            }
+          } catch { /* invalid share data */ }
+        }
       }
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -106,7 +115,7 @@ function AppInner() {
 
   function handleGoToMap() {
     selectVenue(null);
-    navigateTo('map');
+    navigateTo('home');  // 공연장 목록은 홈 페이지에 인라인으로 표시
   }
 
   // ── JSON 저장/불러오기 ──
@@ -142,7 +151,7 @@ function AppInner() {
   return (
     <>
       <Header
-        onHomeClick={() => navigateTo('home')}
+        onHomeClick={handleGoToHome}
         onInsightClick={() => {
           if (page !== 'insight') {
             prevPageRef.current = page;
@@ -198,8 +207,8 @@ function AppInner() {
           <div
             style={{
               background: 'var(--color-bg-primary)', borderRadius: '16px',
-              padding: '32px', maxWidth: '480px', width: '100%',
-              boxShadow: 'var(--shadow-xl)',
+              padding: '32px', maxWidth: '520px', width: '100%', maxHeight: '90vh',
+              overflow: 'auto', boxShadow: 'var(--shadow-xl)',
             }}
             onClick={e => e.stopPropagation()}
           >
@@ -222,7 +231,34 @@ function AppInner() {
                 </div>
               ))}
             </div>
-            <button className="btn btn-primary" style={{ width: '100%', marginTop: '24px' }} onClick={() => setShowHelp(false)}>
+
+            {/* 면책 조항 */}
+            <div style={{
+              marginTop: '20px', padding: '14px 16px',
+              background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)',
+              borderLeft: '3px solid var(--color-accent-primary)',
+            }}>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.7' }}>
+                본 서비스의 성취기준 및 연계 자료(영화, 도서) 추천 기능에는 별도의 AI 기술이 포함되어 있지 않습니다.
+                이는 작품명의 핵심 키워드를 기반으로 한 매칭 시스템으로, 기계적인 추출 특성상 추천 결과가 교육적 의도와
+                완벽히 일치하지 않을 수 있습니다. 수업 설계 시 반드시 내용을 재확인하시고 단순 참고용으로 활용해 주시기 바랍니다.
+              </p>
+            </div>
+
+            {/* 개발자 정보 */}
+            <p style={{ marginTop: '14px', fontSize: '12px', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+              개발자:{' '}
+              <a
+                href="https://litt.ly/chichiboo"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--color-accent-primary)', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+              >
+                교육뮤지컬을 꿈꾸는 치수쌤
+              </a>
+            </p>
+
+            <button className="btn btn-primary" style={{ width: '100%', marginTop: '20px' }} onClick={() => setShowHelp(false)}>
               확인
             </button>
           </div>

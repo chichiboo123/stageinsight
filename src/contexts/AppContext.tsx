@@ -25,7 +25,8 @@ type AppAction =
   | { type: 'ADD_INSIGHT_MEMO'; payload: InsightMemo }
   | { type: 'UPDATE_INSIGHT_MEMO'; payload: InsightMemo }
   | { type: 'DELETE_INSIGHT_MEMO'; payload: string }
-  | { type: 'LOAD_INSIGHT_BOARD'; payload: InsightBoard };
+  | { type: 'LOAD_INSIGHT_BOARD'; payload: InsightBoard }
+  | { type: 'CLEAR_INSIGHT_BOARD' };
 
 // ---------- 초기 상태 ----------
 const INSIGHT_STORAGE_KEY = 'stageinsight-board';
@@ -108,6 +109,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'LOAD_INSIGHT_BOARD':
       saveBoard(action.payload);
       return { ...state, insightBoard: action.payload };
+    case 'CLEAR_INSIGHT_BOARD': {
+      const empty: InsightBoard = { items: [], memos: [] };
+      saveBoard(empty);
+      return { ...state, insightBoard: empty };
+    }
 
     default:
       return state;
@@ -142,6 +148,7 @@ interface AppContextValue {
   updateInsightMemo: (id: string, content: string) => void;
   deleteInsightMemo: (id: string) => void;
   loadInsightBoard: (board: InsightBoard) => void;
+  clearInsightBoard: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -189,6 +196,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadInsightBoard = useCallback((board: InsightBoard) =>
     dispatch({ type: 'LOAD_INSIGHT_BOARD', payload: board }), []);
 
+  const clearInsightBoard = useCallback(() =>
+    dispatch({ type: 'CLEAR_INSIGHT_BOARD' }), []);
+
   return (
     <AppContext.Provider value={{
       state,
@@ -201,6 +211,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateInsightMemo,
       deleteInsightMemo,
       loadInsightBoard,
+      clearInsightBoard,
     }}>
       {children}
     </AppContext.Provider>
