@@ -44,7 +44,9 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
   const { query: perfQuery, setQuery: setPerfQuery, performances, loading: perfLoading, error: perfError, clearResults: clearPerfResults } = usePerformanceSearch();
   const [selectedPerf, setSelectedPerf] = useState<Performance | null>(null);
   const { schools: nearbySchools, loading: schoolsLoading } = useNearbySchools(
-    selectedPerf?.venueId ?? null, 5000
+    selectedPerf?.venueId ?? null,
+    selectedPerf?.venue ?? null,
+    10000,
   );
 
   function handleSchoolSelect(school: School) {
@@ -129,7 +131,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
             ) : (
               <>
                 <SearchBar value={perfQuery} onChange={setPerfQuery} onClear={clearPerfResults}
-                  placeholder="작품 이름을 입력하세요 (예: 지킬앤하이드)" loading={perfLoading} autoFocus />
+                  placeholder="작품 이름을 입력하세요" loading={perfLoading} autoFocus />
                 {!selectedPerf && (performances.length > 0 || perfError || (!perfLoading && perfQuery.trim() && performances.length === 0)) && (
                   <div className={styles.dropdown}>
                     {perfError && <div className={styles.dropdownError}>{perfError}</div>}
@@ -242,7 +244,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
           {/* 인근 학교 */}
           <div className={styles.venueSectionHeader} style={{ marginTop: 'var(--space-5)' }}>
             <h2 className={styles.venueSectionTitle}>🏫 {selectedPerf.venue} 인근 학교</h2>
-            <small className={styles.venueCount}>반경 5km</small>
+            <small className={styles.venueCount}>반경 10km</small>
           </div>
 
           {schoolsLoading && (
@@ -251,7 +253,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
           {!schoolsLoading && nearbySchools.length === 0 && (
             <div className="empty-state">
               <span style={{ fontSize: '32px' }}>🏫</span>
-              <p>반경 5km 내 학교를 찾지 못했습니다.<br />공연장 좌표 정보가 없거나 도심 외 지역일 수 있습니다.</p>
+              <p>반경 10km 내 학교를 찾지 못했습니다.<br />공연장 좌표 정보가 없거나 도심 외 지역일 수 있습니다.</p>
             </div>
           )}
           {!schoolsLoading && nearbySchools.length > 0 && (

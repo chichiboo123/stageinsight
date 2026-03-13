@@ -147,6 +147,21 @@ export async function searchNearbyVenues(
   return docs.slice(0, 20).map(toVenue);
 }
 
+// ---------- 키워드로 단일 좌표 획득 (공연장 이름 → lat/lng 폴백용) ----------
+export async function geocodeKeyword(query: string): Promise<{ lat: number; lng: number } | null> {
+  const params = new URLSearchParams({ query, size: '1' });
+  try {
+    const res = await fetch(`${BASE_URL}/search/keyword.json?${params}`, { headers: authHeader() });
+    if (!res.ok) return null;
+    const data: KakaoSearchResponse = await res.json();
+    const doc = data.documents[0];
+    if (!doc) return null;
+    return { lat: parseFloat(doc.y), lng: parseFloat(doc.x) };
+  } catch {
+    return null;
+  }
+}
+
 // ---------- 반경 내 학교 검색 (SC4) ----------
 export async function searchNearbySchools(
   lat: number,
