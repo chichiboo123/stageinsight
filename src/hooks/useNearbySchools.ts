@@ -1,11 +1,11 @@
 /**
  * useNearbySchools
  * - 공연장 좌표 → 주변 학교 검색 (역방향 검색용)
- * - KOPIS fetchVenueDetail로 공연장 좌표 조회 후 Kakao로 주변 학교 검색
+ * - KOPIS fetchVenueDetail로 좌표 조회, 없으면 Kakao 키워드 지오코딩 폴백
  */
 
 import { useState, useEffect } from 'react';
-import { searchNearbySchools, getRouteInfo, estimateWalkingMinutes } from '../services/kakao';
+import { searchNearbySchools, geocodeKeyword, getRouteInfo, estimateWalkingMinutes } from '../services/kakao';
 import { fetchVenueDetail } from '../services/kopis';
 import type { School, ApiState } from '../types';
 
@@ -21,14 +21,15 @@ interface UseNearbySchoolsReturn extends ApiState<SchoolWithDistance[]> {
 
 export function useNearbySchools(
   venueId: string | null,
-  radiusMeters = 5000,
+  venueName: string | null,
+  radiusMeters = 10000,
 ): UseNearbySchoolsReturn {
   const [state, setState] = useState<ApiState<SchoolWithDistance[]>>({
     data: null, loading: false, error: null,
   });
 
   useEffect(() => {
-    if (!venueId) {
+    if (!venueId && !venueName) {
       setState({ data: null, loading: false, error: null });
       return;
     }
@@ -38,24 +39,39 @@ export function useNearbySchools(
 
     async function run() {
       try {
-        // 1. KOPIS 공연장 상세로 좌표 획득
-        const detail = await fetchVenueDetail(venueId!);
-        if (cancelled) return;
+        let lat: number | undefined;
+        let lng: number | undefined;
 
-        if (!detail.lat || !detail.lng) {
+        // 1. KOPIS 공연장 상세로 좌표 획득
+        if (venueId) {
+          const detail = await fetchVenueDetail(venueId);
+          if (cancelled) return;
+          // KOPIS la/lo가 유효한지 확인 (0이거나 없는 경우 많음)
+          if (detail.lat && detail.lng && detail.lat !== 0 && detail.lng !== 0) {
+            lat = detail.lat;
+            lng = detail.lng;
+          }
+        }
+
+        // 2. KOPIS 좌표 없으면 Kakao 지오코딩 폴백
+        if ((!lat || !lng) && venueName) {
+          const geo = await geocodeKeyword(venueName);
+          if (cancelled) return;
+          if (geo) { lat = geo.lat; lng = geo.lng; }
+        }
+
+        if (!lat || !lng) {
           setState({ data: [], loading: false, error: null });
           return;
         }
 
-        const { lat, lng } = detail;
-
-        // 2. 카카오로 주변 학교 검색
+        // 3. 카카오로 주변 학교 검색
         const rawSchools = await searchNearbySchools(lat, lng, radiusMeters);
         if (cancelled) return;
 
-        // 3. 경로 정보 병렬 조회
+        // 4. 경로 정보 병렬 조회
         const routeResults = await Promise.allSettled(
-          rawSchools.map(s => getRouteInfo(lat, lng, s.lat, s.lng))
+          rawSchools.map(s => getRouteInfo(lat!, lng!, s.lat, s.lng))
         );
         if (cancelled) return;
 
@@ -86,7 +102,7 @@ export function useNearbySchools(
 
     run();
     return () => { cancelled = true; };
-  }, [venueId, radiusMeters]);
+  }, [venueId, venueName, radiusMeters]);
 
   return {
     schools: state.data ?? [],
