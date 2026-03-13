@@ -78,6 +78,31 @@ export async function fetchPerformanceDetail(mtId: string): Promise<Performance 
   return items[0] ?? null;
 }
 
+// ---------- 공연명으로 검색 ----------
+export async function fetchPerformancesByName(
+  name: string,
+  rows = 20,
+): Promise<Performance[]> {
+  if (!name.trim()) return [];
+  const threeMonthsAgo = formatDate(addMonths(new Date(), -3));
+  const threeMonthsLater = formatDate(addMonths(new Date(), 3));
+
+  const params = new URLSearchParams({
+    service: API_KEY,
+    stdate: threeMonthsAgo,
+    eddate: threeMonthsLater,
+    shprfnm: name,        // 공연명 검색
+    rows: String(rows),
+    cpage: '1',
+  });
+
+  const res = await fetch(`${BASE_URL}/pblprfr?${params}`);
+  if (!res.ok) throw new Error(`KOPIS 공연명 검색 실패: ${res.statusText}`);
+
+  const xml = await res.text();
+  return parsePerformanceListXml(xml);
+}
+
 // ---------- 공연장 정보 조회 ----------
 export async function fetchVenueDetail(fcltyCd: string): Promise<Partial<Venue>> {
   const params = new URLSearchParams({ service: API_KEY });
@@ -201,12 +226,16 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
 
 function parseVenueXml(xml: string): Partial<Venue> {
   const db = getAllTags(xml, 'db')[0] ?? '';
+  const la = getTagContent(db, 'la');
+  const lo = getTagContent(db, 'lo');
   return {
     id: getTagContent(db, 'mt10id'),
     name: getTagContent(db, 'fcltynm'),
     address: getTagContent(db, 'adres'),
     phone: getTagContent(db, 'telno') || undefined,
     seats: parseInt(getTagContent(db, 'seatscale')) || undefined,
+    lat: la ? parseFloat(la) : undefined,
+    lng: lo ? parseFloat(lo) : undefined,
   };
 }
 

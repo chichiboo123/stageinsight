@@ -49,6 +49,39 @@
   max-width: 560px;
 }
 
+/* 모드 토글 */
+.modeToggle {
+  display: flex;
+  gap: var(--space-1);
+  background: rgba(255,255,255,0.35);
+  backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+.modeBtn {
+  padding: 8px 20px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+.modeBtn:hover {
+  background: rgba(255,255,255,0.5);
+  color: var(--color-text-primary);
+}
+.modeBtnActive {
+  background: var(--color-accent-primary);
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+}
+
 /* 검색 영역 */
 .searchWrapper {
   position: relative;
@@ -275,6 +308,40 @@
 .badgeEmpty {
   background: var(--color-bg-tertiary, #e5e7eb);
   color: var(--color-text-muted);
+}
+
+/* 선택된 공연 카드 (역방향 모드) */
+.selectedPerfCard {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--color-accent-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.perfPoster {
+  width: 60px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.selectedPerfInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.selectedPerfTitle {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
 }
 
 /* 기능 소개 */

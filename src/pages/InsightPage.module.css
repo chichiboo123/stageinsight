@@ -23,6 +23,19 @@
   color: var(--color-text-secondary);
 }
 
+.clearBtn {
+  color: var(--color-text-muted);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.clearBtn:hover {
+  color: #ef4444;
+  background: #fee2e2;
+}
+
 /* 내보내기 섹션 */
 .exportSection {
   display: flex;
