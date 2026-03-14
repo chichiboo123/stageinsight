@@ -93,7 +93,7 @@ export async function searchSchools(query: string): Promise<School[]> {
   return docs.slice(0, 10).map(toSchool);
 }
 
-// ---------- 반경 내 공연장 검색 (최대 20곳, 2페이지) ----------
+// ---------- 반경 내 공연장 검색 (페이지네이션, is_end까지) ----------
 export async function searchNearbyVenues(
   lat: number,
   lng: number,
@@ -104,18 +104,10 @@ export async function searchNearbyVenues(
     category_group_code: 'CT1',
     x: String(lng),
     y: String(lat),
-    radius: String(Math.min(radiusMeters, 20000)), // 카카오 최대 20km
+    radius: String(Math.min(radiusMeters, 20000)),
     sort: 'distance',
     size: '15',
   };
-
-  const p1 = new URLSearchParams({ ...baseParams, page: '1' });
-  const p2 = new URLSearchParams({ ...baseParams, page: '2' });
-
-  const [r1, r2] = await Promise.allSettled([
-    fetch(`${BASE_URL}/search/keyword.json?${p1}`, { headers: authHeader() }),
-    fetch(`${BASE_URL}/search/keyword.json?${p2}`, { headers: authHeader() }),
-  ]);
 
   const toVenue = (doc: KakaoDocument): Venue => ({
     id: doc.id,
@@ -128,23 +120,27 @@ export async function searchNearbyVenues(
 
   const docs: KakaoDocument[] = [];
   const seen = new Set<string>();
+  let firstFailed = false;
 
-  for (const r of [r1, r2]) {
-    if (r.status !== 'fulfilled' || !r.value.ok) continue;
-    const data: KakaoSearchResponse = await r.value.json();
-    for (const doc of data.documents) {
-      if (!seen.has(doc.id)) {
-        seen.add(doc.id);
-        docs.push(doc);
-      }
+  for (let page = 1; page <= 5; page++) {
+    const params = new URLSearchParams({ ...baseParams, page: String(page) });
+    const res = await fetch(`${BASE_URL}/search/keyword.json?${params}`, { headers: authHeader() });
+    if (!res.ok) {
+      if (page === 1) firstFailed = true;
+      break;
     }
+    const data: KakaoSearchResponse = await res.json();
+    for (const doc of data.documents) {
+      if (!seen.has(doc.id)) { seen.add(doc.id); docs.push(doc); }
+    }
+    if (data.meta.is_end) break;
   }
 
-  if (docs.length === 0 && r1.status === 'rejected') {
+  if (docs.length === 0 && firstFailed) {
     throw new Error('주변 공연장 검색 실패: 네트워크 오류');
   }
 
-  return docs.slice(0, 20).map(toVenue);
+  return docs.map(toVenue);
 }
 
 // ---------- 키워드로 단일 좌표 획득 (공연장 이름 → lat/lng 폴백용) ----------

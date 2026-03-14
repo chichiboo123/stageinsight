@@ -99,17 +99,31 @@ function extractTitleTerms(title: string): string[] {
 export async function recommendBooksForPerformance(
   performanceTitle: string,
   keywords: string[] = [],
+  genre?: string,
 ): Promise<Book[]> {
   const titleTerms = extractTitleTerms(performanceTitle);
   // 제목 전체 + 부제 각각 + 키워드 순으로, 중복 제거, 최대 6개 쿼리
   const queries = [...new Set([performanceTitle, ...titleTerms, ...keywords])].slice(0, 6);
 
-  const results = await Promise.allSettled(
-    queries.map(q => searchBooks(q, 10))
-  );
+  // 뮤지컬 장르면 고정 도서 선행 검색
+  const musicalBookPromise = genre === '뮤지컬'
+    ? searchBooks('세상에서 가장 쉬운 뮤지컬 수업 원치수', 1)
+    : Promise.resolve([]);
+
+  const [musicalResult, ...results] = await Promise.allSettled([
+    musicalBookPromise,
+    ...queries.map(q => searchBooks(q, 10)),
+  ]);
 
   const seen = new Set<string>();
   const merged: Book[] = [];
+
+  // 뮤지컬이면 고정 도서를 맨 앞에 삽입
+  if (musicalResult.status === 'fulfilled') {
+    for (const book of musicalResult.value) {
+      if (!seen.has(book.isbn)) { seen.add(book.isbn); merged.push(book); }
+    }
+  }
 
   for (const res of results) {
     if (res.status === 'fulfilled') {
@@ -122,8 +136,10 @@ export async function recommendBooksForPerformance(
     }
   }
 
-  // 종교 관련 도서 제외
+  // 종교 관련 도서 제외 (고정 도서는 제외 대상에서 보호)
+  const fixedIsbn = merged[0]?.isbn && genre === '뮤지컬' ? merged[0].isbn : null;
   return merged.filter(book => {
+    if (fixedIsbn && book.isbn === fixedIsbn) return true;
     const text = `${book.title} ${book.description} ${book.author} ${book.publisher}`.toLowerCase();
     return !RELIGIOUS_KEYWORDS.some(kw => text.includes(kw));
   }).slice(0, 20);

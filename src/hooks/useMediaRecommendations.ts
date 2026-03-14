@@ -58,6 +58,7 @@ export function useMediaRecommendations(performance: Performance | null): MediaS
     const bookPromise = recommendBooksForPerformance(
       performance.title,
       performance.keywords ?? [],
+      performance.genre,
     );
 
     // 영화 결과
