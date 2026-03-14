@@ -115,7 +115,7 @@ export async function recommendBooksForPerformance(
 
   // 뮤지컬 장르면 고정 도서 검색 (저자명 없이 제목만으로)
   const musicalBookPromise = genre === '뮤지컬'
-    ? searchBooks('세상에서 가장 쉬운 뮤지컬 수업', 5)
+    ? searchBooks('뮤지컬 수업 온오프라인 교육뮤지컬', 5)
     : Promise.resolve([]);
 
   const [musicalResult, ...results] = await Promise.allSettled([
@@ -127,7 +127,7 @@ export async function recommendBooksForPerformance(
   let fixedBook: Book | null = null;
   if (genre === '뮤지컬' && musicalResult.status === 'fulfilled') {
     fixedBook = musicalResult.value.find(b =>
-      b.title.includes('세상에서 가장 쉬운 뮤지컬') || b.author.includes('원치수')
+      b.title.includes('뮤지컬 수업') && (b.title.includes('온오프라인') || b.title.includes('교육뮤지컬'))
     ) ?? null;
   }
 
