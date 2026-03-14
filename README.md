@@ -1,73 +1,120 @@
-# React + TypeScript + Vite
+# 스테이지인사이트 (Stage Insight)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> 학교와 예술을 연결하다 — 교사를 위한 공연 연계 교육과정 탐색 도구
 
-Currently, two official plugins are available:
+**개발자:** [교육뮤지컬 꿈꾸는 치수쌤](https://litt.ly/chichiboo)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 소개
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**스테이지인사이트**는 학교 교사가 주변 공연장의 공연 정보를 탐색하고, 이를 교육과정 성취기준과 연계하여 수업을 설계할 수 있도록 돕는 웹 서비스입니다.
 
-## Expanding the ESLint configuration
+공연 관람을 단순한 문화 체험이 아닌, 교육과정과 맞닿은 수업 활동으로 연결하고자 하는 교육 현장의 고민에서 출발했습니다.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 주요 기능
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 🏫 학교 → 공연장 탐색
+- 학교명 검색 → 반경 10km 내 공연장 자동 탐색
+- 공연장별 도보·대중교통 이동 시간 제공
+- 현재 공연 없는 공연장 음영 구분 표시
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 🎭 공연 대시보드
+- 선택한 공연장의 현재 공연·예정 공연 목록 조회
+- 공연 상세 정보 (장르, 기간, 관람 연령, 출연진 등)
+
+### 📚 교육과정 성취기준 연계
+- 공연 선택 시 관련 성취기준 자동 매칭 (2022 개정 / 2022 개정 특수 / 2019 누리과정)
+- 학년군·교과 토글 필터로 원하는 성취기준만 빠르게 탐색
+
+### 🎬 연계 추천 자료
+- 공연 주제와 연결된 영화·도서 자동 추천
+- 키워드 기반 매칭 시스템 (AI 미사용)
+
+### 🗂 인사이트 바구니
+- 공연·성취기준·영화·도서를 바구니에 담아 수업 아이디어 정리
+- 항목 드래그 앤 드롭 순서 변경
+- 메모 작성 기능
+- 이미지·PDF 저장 / 클립보드 복사 / URL 공유 / JSON 파일 저장·불러오기
+
+### 🎭 작품 → 학교 역방향 검색
+- 공연 제목으로 검색 → 공연장 위치 기반 인근 학교 탐색
+- 학교 클릭 시 해당 학교 기준 공연 대시보드로 바로 이동
+
+---
+
+## 기술 스택
+
+| 구분 | 내용 |
+|------|------|
+| 프레임워크 | React 19 + TypeScript + Vite |
+| 상태 관리 | useReducer + Context API |
+| 스타일 | CSS Modules |
+| 배포 | Netlify |
+
+---
+
+## 데이터 출처
+
+본 서비스는 아래 공개 API를 활용합니다. 각 API의 이용약관을 준수합니다.
+
+| API | 용도 |
+|-----|------|
+| [KOPIS (공연예술통합전산망)](https://www.kopis.or.kr) | 공연 정보, 공연장 정보 |
+| [카카오맵 API](https://developers.kakao.com) | 학교·공연장 위치 검색, 경로 안내 |
+| [NAVER Search API](https://developers.naver.com) | 연계 도서 검색 |
+| [TMDB](https://www.themoviedb.org) | 연계 영화 검색 |
+
+> API 키 등 인증 정보는 환경 변수(`.env`)로 관리하며, 이 저장소에 포함되지 않습니다.
+
+---
+
+## 로컬 실행
+
+```bash
+# 의존성 설치
+npm install
+
+# 환경 변수 설정
+cp .env.example .env
+# .env 파일에 각 API 키를 입력하세요
+
+# 개발 서버 실행
+npm run dev
+
+# 빌드
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+필요한 환경 변수:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_KOPIS_KEY=
+VITE_KAKAO_REST_API_KEY=
+VITE_KAKAO_JS_API_KEY=
+VITE_NAVER_CLIENT_ID=
+VITE_NAVER_CLIENT_SECRET=
+VITE_TMDB_API_KEY=
+```
+
+---
+
+## 저작권 및 아이디어 보호 안내
+
+이 프로젝트는 교육 현장의 필요에서 출발한 개인 개발 프로젝트입니다.
+
+서비스의 기획 의도, UI/UX 구성, 교육과정 연계 아이디어 등은 개발자의 독창적인 아이디어를 바탕으로 합니다.
+코드는 오픈소스로 공개되어 있으나, **서비스의 아이디어와 기획을 무단으로 복제하거나 유사 서비스를 제작하는 행위는 지양해 주시기 바랍니다.**
+
+학습·연구 목적의 코드 참고는 환영하며, 출처를 밝혀 주시면 감사하겠습니다.
+
+문의 및 제안: [litt.ly/chichiboo](https://litt.ly/chichiboo)
+
+---
+
+## 면책 조항
+
+성취기준 및 연계 자료(영화, 도서) 추천 기능은 AI 기술 없이 키워드 매칭 방식으로 동작합니다.
+추천 결과가 교육적 의도와 완벽히 일치하지 않을 수 있으므로, 수업 설계 시 반드시 내용을 재확인하고 단순 참고용으로 활용해 주시기 바랍니다.
