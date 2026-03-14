@@ -49,22 +49,28 @@ export async function fetchPerformancesByVenue(
   // (공연이 수개월 전에 시작해서 현재 진행 중인 경우도 포함)
   const threeMonthsAgo = formatDate(addMonths(new Date(), -3));
   const threeMonthsLater = formatDate(addMonths(new Date(), 3));
+  const ROWS = 100; // KOPIS 최대 rows
 
-  const params = new URLSearchParams({
-    service: API_KEY,
-    stdate: dateFrom ?? threeMonthsAgo,
-    eddate: dateTo ?? threeMonthsLater,
-    shprfnmfct: venueName,     // 공연시설명 검색
-    rows: '50',
-    cpage: '1',
-    // prfstate는 쉼표 구분자 미지원 — 제거 후 날짜 범위로 필터링
-  });
-
-  const res = await fetch(`${BASE_URL}/pblprfr?${params}`);
-  if (!res.ok) throw new Error(`KOPIS 공연 조회 실패: ${res.statusText}`);
-
-  const xml = await res.text();
-  const all = parsePerformanceListXml(xml);
+  // 페이지네이션: 결과가 ROWS개이면 다음 페이지도 조회
+  const all: Performance[] = [];
+  let page = 1;
+  while (true) {
+    const params = new URLSearchParams({
+      service: API_KEY,
+      stdate: dateFrom ?? threeMonthsAgo,
+      eddate: dateTo ?? threeMonthsLater,
+      shprfnmfct: venueName,
+      rows: String(ROWS),
+      cpage: String(page),
+    });
+    const res = await fetch(`${BASE_URL}/pblprfr?${params}`);
+    if (!res.ok) throw new Error(`KOPIS 공연 조회 실패: ${res.statusText}`);
+    const xml = await res.text();
+    const batch = parsePerformanceListXml(xml);
+    all.push(...batch);
+    if (batch.length < ROWS) break; // 마지막 페이지
+    page++;
+  }
 
   // 공연완료 제외 + 공연장명 정규화 일치 필터 (다른 도시 동명 공연장 제외)
   const normTarget = normalizeVenueName(venueName);
