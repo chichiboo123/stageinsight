@@ -190,6 +190,74 @@
   flex-wrap: wrap;
 }
 
+/* 토글 칩 필터 */
+.filterGroup {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.filterLabel {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 6px;
+  min-width: 32px;
+}
+
+.filterChips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.filterChip:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  background: var(--color-bg-primary);
+}
+
+.filterChipActive {
+  border-color: var(--color-accent-primary);
+  background: var(--color-accent-primary);
+  color: var(--color-text-on-accent);
+}
+
+.filterChipActive:hover {
+  opacity: 0.88;
+  color: var(--color-text-on-accent);
+}
+
+.chipCheck {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* 방향 안내 텍스트 (모바일/데스크톱 분기) */
+.directionDesktop { display: inline; }
+.directionMobile  { display: none; }
+
 .emptyText {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
@@ -363,6 +431,8 @@
     position: static;
     max-height: none;
   }
+  .directionDesktop { display: none; }
+  .directionMobile  { display: inline; }
   .perfCards {
     flex-direction: column;
   }
