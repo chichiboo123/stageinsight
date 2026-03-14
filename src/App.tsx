@@ -178,7 +178,7 @@ function AppInner() {
       {/* 푸터 */}
       <footer style={{
         borderTop: '1px solid var(--color-border)',
-        padding: '14px 0',
+        padding: '14px 0 16px',
         textAlign: 'center',
         fontSize: '13px',
         color: 'var(--color-text-muted)',
@@ -192,6 +192,9 @@ function AppInner() {
         >
           교육뮤지컬 꿈꾸는 치수쌤
         </a>
+        <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--color-text-muted)', opacity: 0.75 }}>
+          데이터 출처: KOPIS(공연예술통합전산망) · 카카오맵 API · NAVER Search API · TMDB
+        </div>
       </footer>
 
       {/* 사용법 모달 */}
@@ -243,6 +246,32 @@ function AppInner() {
                 이는 작품명의 핵심 키워드를 기반으로 한 매칭 시스템으로, 기계적인 추출 특성상 추천 결과가 교육적 의도와
                 완벽히 일치하지 않을 수 있습니다. 수업 설계 시 반드시 내용을 재확인하시고 단순 참고용으로 활용해 주시기 바랍니다.
               </p>
+            </div>
+
+            {/* API 출처 */}
+            <div style={{
+              marginTop: '16px', padding: '12px 14px',
+              background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)',
+            }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                데이터 출처
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[
+                  { label: 'KOPIS', desc: '공연예술통합전산망 — 공연·공연장 정보' },
+                  { label: '카카오맵 API', desc: '학교·공연장 위치 검색 및 경로 안내' },
+                  { label: 'NAVER Search API', desc: '연계 도서 검색' },
+                  { label: 'TMDB', desc: '연계 영화 검색' },
+                ].map(({ label, desc }) => (
+                  <span key={label} style={{
+                    fontSize: '11px', color: 'var(--color-text-secondary)',
+                    background: 'var(--color-bg-primary)', border: '1px solid var(--color-border)',
+                    borderRadius: '6px', padding: '3px 8px',
+                  }} title={desc}>
+                    {label}
+                  </span>
+                ))}
+              </div>
             </div>
 
             {/* 개발자 정보 */}
