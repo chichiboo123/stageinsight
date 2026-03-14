@@ -302,7 +302,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
         <main className={styles.dashboard}>
           {!selectedPerformance ? (
             <div className="empty-state" style={{ minHeight: '400px' }}>
-              <span style={{ fontSize: '48px' }}>👈</span>
+              <span style={{ fontSize: '48px' }}>🖱️</span>
               <p>
                 <span className={styles.directionDesktop}>왼쪽에서</span>
                 <span className={styles.directionMobile}>위쪽에서</span>
