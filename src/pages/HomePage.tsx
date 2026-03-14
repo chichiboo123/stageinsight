@@ -25,10 +25,12 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
   const { venues, loading: venueLoading } = useNearbyVenues(state.selectedSchool, 10000);
 
   const [perfStatus, setPerfStatus] = useState<Map<string, boolean>>(new Map());
+  const [perfStatusLoading, setPerfStatusLoading] = useState(false);
   useEffect(() => {
-    if (venues.length === 0) { setPerfStatus(new Map()); return; }
+    if (venues.length === 0) { setPerfStatus(new Map()); setPerfStatusLoading(false); return; }
     let cancelled = false;
     setPerfStatus(new Map());
+    setPerfStatusLoading(true);
     Promise.allSettled(
       venues.map(v => fetchPerformancesByVenue(v.name).then(perfs => ({ id: v.id, has: perfs.length > 0 })))
     ).then(results => {
@@ -36,6 +38,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
       const map = new Map<string, boolean>();
       results.forEach(r => { if (r.status === 'fulfilled') map.set(r.value.id, r.value.has); });
       setPerfStatus(map);
+      setPerfStatusLoading(false);
     });
     return () => { cancelled = true; };
   }, [venues]);
@@ -116,7 +119,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
 
           <p className={styles.heroSubtitle}>
             {mode === 'school'
-              ? '학교명 → 공연장 → 작품 → 교육과정 연계'
+              ? '학교명 → 공연장 → 작품 → 교육과정'
               : '작품명 → 공연장 위치 → 인근 학교 탐색'}
           </p>
 
@@ -195,6 +198,9 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
           )}
           {!venueLoading && venues.length > 0 && (
             <>
+              {perfStatusLoading && (
+                <div className={styles.venueLoading}><span className={styles.spinner} /><span>공연장 검색 중...</span></div>
+              )}
               <p className={styles.venueCount}>총 {venues.length}곳 검색됨</p>
               <div className={styles.venueGrid}>
                 {venues.map(venue => {
@@ -324,6 +330,6 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
 const FEATURES = [
   { icon: '🗺️', title: '공연장 탐색', desc: '학교 주변 공연장 찾기' },
   { icon: '🎭', title: '공연 정보', desc: 'KOPIS 공연 정보 제공' },
-  { icon: '📚', title: '교육과정 연계', desc: '최신 성취기준 자동 매칭' },
+  { icon: '📚', title: '교육과정', desc: '최신 성취기준 매칭' },
   { icon: '🎬', title: '예술의 확장', desc: '영화·독서 등 융합 수업 아이디어 제공' },
 ];
