@@ -15,6 +15,15 @@ const CURRICULUM_FILTERS: { label: string; value: CurriculumType }[] = [
   { label: '2019 누리과정', value: '2019 누리과정' },
 ];
 
+const GRADE_ORDER = [
+  '초등학교 1~2학년',
+  '초등학교 3~4학년',
+  '초등학교 5~6학년',
+  '중학교 1~3학년',
+  '고등학교 1~3학년',
+  '유아',
+];
+
 interface DashboardPageProps {
   onGoToMap?: () => void;
 }
@@ -203,7 +212,14 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const { matches, loading: currLoading, activeFilters, setFilters } = useCurriculumMatch(displayPerformance);
 
   // 학년군·교과 필터 옵션 (매칭 결과에서 동적 추출)
-  const availableGrades = useMemo(() => [...new Set(matches.map(m => m.standard.grade))].sort(), [matches]);
+  const availableGrades = useMemo(() => {
+    const grades = [...new Set(matches.map(m => m.standard.grade))];
+    return grades.sort((a, b) => {
+      const ai = GRADE_ORDER.indexOf(a ?? '');
+      const bi = GRADE_ORDER.indexOf(b ?? '');
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }, [matches]);
   const availableSubjects = useMemo(() => [...new Set(matches.map(m => m.standard.subject))].sort(), [matches]);
 
   // 학년군·교과 필터 적용
@@ -287,7 +303,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
           {!selectedPerformance ? (
             <div className="empty-state" style={{ minHeight: '400px' }}>
               <span style={{ fontSize: '48px' }}>👈</span>
-              <p>왼쪽에서 공연을 선택하면<br />교육과정 연계 정보가 나타납니다.</p>
+              <p>
+                <span className={styles.directionDesktop}>왼쪽에서</span>
+                <span className={styles.directionMobile}>위쪽에서</span>
+                {' '}공연을 선택하면<br />교육과정 연계 정보가 나타납니다.
+              </p>
             </div>
           ) : (
             <>
@@ -396,18 +416,23 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
               <section className={styles.section}>
                 <div className={styles.sectionHeader}>
                   <h3 className="section-title">교육과정 성취기준</h3>
-                  <div className={styles.filterBtns}>
+                </div>
+
+                {/* 과정 필터 */}
+                <div className={styles.filterGroup}>
+                  <span className={styles.filterLabel}>과정</span>
+                  <div className={styles.filterChips}>
                     {CURRICULUM_FILTERS.map(f => (
                       <button
                         key={f.value}
-                        className={`btn ${activeFilters.includes(f.value) ? 'btn-primary' : 'btn-outline'}`}
+                        className={`${styles.filterChip} ${activeFilters.includes(f.value) ? styles.filterChipActive : ''}`}
                         onClick={() => setFilters(
                           activeFilters.includes(f.value)
                             ? activeFilters.filter(x => x !== f.value)
                             : [...activeFilters, f.value]
                         )}
-                        style={{ padding: '6px 14px', fontSize: 'var(--font-size-xs)' }}
                       >
+                        {activeFilters.includes(f.value) && <span className={styles.chipCheck}>✓</span>}
                         {f.label}
                       </button>
                     ))}
@@ -416,41 +441,47 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
 
                 {/* 학년군 필터 */}
                 {availableGrades.length > 0 && (
-                  <div className={styles.filterBtns}>
-                    {availableGrades.map(grade => (
-                      <button
-                        key={grade}
-                        className={`btn ${gradeFilter.includes(grade) ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => setGradeFilter(
-                          gradeFilter.includes(grade)
-                            ? gradeFilter.filter(g => g !== grade)
-                            : [...gradeFilter, grade]
-                        )}
-                        style={{ padding: '5px 12px', fontSize: '11px' }}
-                      >
-                        {grade}
-                      </button>
-                    ))}
+                  <div className={styles.filterGroup}>
+                    <span className={styles.filterLabel}>학년군</span>
+                    <div className={styles.filterChips}>
+                      {availableGrades.map(grade => (
+                        <button
+                          key={grade}
+                          className={`${styles.filterChip} ${gradeFilter.includes(grade ?? '') ? styles.filterChipActive : ''}`}
+                          onClick={() => setGradeFilter(
+                            gradeFilter.includes(grade ?? '')
+                              ? gradeFilter.filter(g => g !== grade)
+                              : [...gradeFilter, grade ?? '']
+                          )}
+                        >
+                          {gradeFilter.includes(grade ?? '') && <span className={styles.chipCheck}>✓</span>}
+                          {grade}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {/* 교과 필터 */}
                 {availableSubjects.length > 0 && (
-                  <div className={styles.filterBtns}>
-                    {availableSubjects.map(subject => (
-                      <button
-                        key={subject}
-                        className={`btn ${subjectFilter.includes(subject) ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => setSubjectFilter(
-                          subjectFilter.includes(subject)
-                            ? subjectFilter.filter(s => s !== subject)
-                            : [...subjectFilter, subject]
-                        )}
-                        style={{ padding: '5px 12px', fontSize: '11px' }}
-                      >
-                        {subject}
-                      </button>
-                    ))}
+                  <div className={styles.filterGroup}>
+                    <span className={styles.filterLabel}>교과</span>
+                    <div className={styles.filterChips}>
+                      {availableSubjects.map(subject => (
+                        <button
+                          key={subject}
+                          className={`${styles.filterChip} ${subjectFilter.includes(subject) ? styles.filterChipActive : ''}`}
+                          onClick={() => setSubjectFilter(
+                            subjectFilter.includes(subject)
+                              ? subjectFilter.filter(s => s !== subject)
+                              : [...subjectFilter, subject]
+                          )}
+                        >
+                          {subjectFilter.includes(subject) && <span className={styles.chipCheck}>✓</span>}
+                          {subject}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
