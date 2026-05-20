@@ -177,6 +177,7 @@ function parsePerformanceListXml(xml: string): Performance[] {
   const dbs = getAllTags(xml, 'db');
   return dbs.map(db => {
     const genreCd = getTagContent(db, 'genrenm');
+    const childRaw = getTagContent(db, 'child');
     return {
       id: getTagContent(db, 'mt20id'),
       title: getTagContent(db, 'prfnm'),
@@ -188,6 +189,7 @@ function parsePerformanceListXml(xml: string): Performance[] {
       endDate: getTagContent(db, 'prfpdto'),
       poster: getTagContent(db, 'poster') || undefined,
       rating: getTagContent(db, 'prfage') || undefined,
+      child: childRaw === 'Y' ? true : childRaw === 'N' ? false : undefined,
       keywords: [],
     };
   });
@@ -217,6 +219,7 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
       }
     }
 
+    const childRaw = getTagContent(db, 'child');
     return {
       id: getTagContent(db, 'mt20id'),
       title: getTagContent(db, 'prfnm'),
@@ -231,6 +234,7 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
       rating: getTagContent(db, 'prfage') || undefined,
       price: getTagContent(db, 'pcseguidance') || undefined,
       synopsis: stripHtml(getTagContent(db, 'sty')) || undefined,
+      child: childRaw === 'Y' ? true : childRaw === 'N' ? false : undefined,
       cast: castRaw ? castRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
       crew: crewRaw ? crewRaw.split(',').map(s => s.trim()).filter(Boolean) : undefined,
       images: images.length > 0 ? images : undefined,
