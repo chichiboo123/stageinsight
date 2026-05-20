@@ -105,12 +105,47 @@
   position: relative;
 }
 
+/* 클릭 가능한 포스터 래퍼 */
+.posterWrapper {
+  position: relative;
+  flex-shrink: 0;
+  width: 140px;
+  height: 190px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
 .detailPoster {
   width: 140px;
   height: 190px;
   object-fit: cover;
   border-radius: var(--radius-md);
-  flex-shrink: 0;
+  display: block;
+  transition: filter var(--transition-fast);
+}
+
+.posterWrapper:hover .detailPoster {
+  filter: brightness(0.7);
+}
+
+/* 포스터 호버 오버레이 */
+.posterOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+}
+
+.posterWrapper:hover .posterOverlay {
+  opacity: 1;
 }
 
 .detailInfo {
@@ -454,6 +489,10 @@
     flex-direction: column;
     padding: var(--space-4);
     gap: var(--space-4);
+  }
+  .posterWrapper {
+    width: 100%;
+    height: 200px;
   }
   .detailPoster {
     width: 100%;

@@ -55,6 +55,7 @@ export interface Performance {
   rating?: string;      // 관람연령
   price?: string;
   synopsis?: string;
+  child?: boolean;      // 아동 여부 (KOPIS child 필드)
   keywords?: string[];
   cast?: string[];
   crew?: string[];    // prfcrew 제작진
