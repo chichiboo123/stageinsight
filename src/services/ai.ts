@@ -16,6 +16,7 @@ import type {
   MediaCuration,
 } from '../types';
 import { setAIStatus } from './aiStatus';
+import { cleanWorkTitle } from './wiki';
 
 const CACHE_PREFIX = 'ai-cache:v5:';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30일
@@ -142,7 +143,7 @@ export async function aiLessonIdeas(params: {
   if (cached) return cached;
 
   const result = await postAI<LessonPlan>('lesson-ideas', '융합수업 설계', {
-    performanceTitle: params.performanceTitle,
+    performanceTitle: cleanWorkTitle(params.performanceTitle),
     genre: params.genre,
     synopsis: params.synopsis,
     runtime: params.runtime,
@@ -170,7 +171,8 @@ export async function aiIntroducePerformance(performance: Performance): Promise<
 
   const fmt = (d?: string) => (d && d.length >= 8 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}` : d ?? '');
   const result = await postAI<PerformanceIntro>('introduce-performance', '작품 소개', {
-    title: performance.title,
+    // 지역·회차 주석([서울] 등)을 제거한 순수 작품명으로 검색 정확도 향상
+    title: cleanWorkTitle(performance.title),
     genre: performance.genre,
     synopsis: performance.synopsis ?? '',
     // 웹 검색 그라운딩으로 "바로 그 공연"을 특정하기 위한 단서
