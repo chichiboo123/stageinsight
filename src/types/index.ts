@@ -86,28 +86,43 @@ export interface CurriculumMatch {
   aiRelevance?: number;    // AI 적합도 1~5 (AI 큐레이션 시)
 }
 
-// ---------- AI 수업 아이디어 (Phase 2) ----------
+// ---------- AI 융합 수업 아이디어 ----------
 export interface LessonActivity {
   title: string;
   description: string;
   duration?: string;
+  linkedMedia?: string;   // 이 활동에서 활용하는 공연/영화/도서
 }
 
 export interface LessonPlan {
+  title?: string;
   overview: string;
   gradeBand?: string;
+  convergenceFocus?: string;   // 공연·영화·도서를 잇는 융합 포인트
   objectives: string[];
   activities: LessonActivity[];
   discussionQuestions: string[];
   assessment?: string;
+  _model?: string | null;
 }
 
-// ---------- AI 공연 의미 보강 (Phase 3) ----------
-export interface PerformanceEnrichment {
+// ---------- AI 작품 상세 소개 ----------
+export interface PerformanceIntro {
+  summary: string;
   themes: string[];
-  curriculumKeywords: string[];
+  watchPoints: string[];
+  educationalValue?: string;
+  discussionStarters: string[];
+  _model?: string | null;
+}
+
+// ---------- AI 영화·도서 추천 큐레이션 ----------
+export interface MediaCuration {
+  movieSelections: Array<{ id: string; reason: string }>;
+  bookSelections: Array<{ isbn: string; reason: string }>;
   movieQueries: string[];
   bookQueries: string[];
+  _model?: string | null;
 }
 
 // ---------- 영화 (TMDB) ----------
@@ -122,6 +137,7 @@ export interface Movie {
   voteAverage: number;
   genres?: string[];
   runtime?: number;
+  aiReason?: string;   // AI 큐레이션 시 공연과의 연결 근거
 }
 
 // ---------- 도서 (네이버북) ----------
@@ -135,6 +151,7 @@ export interface Book {
   image?: string;
   link: string;
   price?: number;
+  aiReason?: string;   // AI 큐레이션 시 공연과의 연결 근거
 }
 
 // ---------- 인사이트 보드 ----------

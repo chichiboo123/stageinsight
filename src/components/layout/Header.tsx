@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTheme, THEME_OPTIONS } from '../../contexts/ThemeContext';
 import type { ThemeKey } from '../../types';
+import { AIStatusBadge } from '../common/AIStatusBadge';
 import styles from './Header.module.css';
 
 interface HeaderProps {
@@ -54,6 +55,9 @@ export function Header({ onHomeClick, onInsightClick, insightCount, onSaveJSON, 
 
         {/* 우측 컨트롤 */}
         <div className={styles.controls}>
+          {/* AI 호출 상태(배터리) 표시 */}
+          <AIStatusBadge />
+
           {/* 테마 드롭다운 */}
           <div className={styles.themeDropdown} ref={themeRef}>
             <button
