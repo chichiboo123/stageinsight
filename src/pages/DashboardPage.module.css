@@ -389,12 +389,12 @@
   color: var(--color-accent-dark);
 }
 
-/* 담기 아이콘 버튼 (공통) — 항상 우측 하단 고정 표시 */
-/* KRDS 권장 최소 터치 타깃 44×44px 확보 (모바일 접근성) */
+/* 담기 아이콘 버튼 (공통) — 정보 영역 흐름 안 우측 하단에 배치 */
+/* KRDS 권장 최소 터치 타깃 44×44px 확보 (모바일 접근성).
+   absolute 대신 flex 흐름에 두어 본문(줄거리·예매링크)을 가리지 않게 한다. */
 .bookmarkBtn {
-  position: absolute;
-  bottom: var(--space-3);
-  right: var(--space-3);
+  align-self: flex-end;
+  margin-top: auto;
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
@@ -405,15 +405,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
+/* 작은 담기 버튼 — 카드 흐름 안에서 우측 하단에 배치(텍스트 겹침 방지).
+   absolute 대신 flex 흐름에 두어 본문 위로 떠서 글자를 가리지 않게 한다.
+   margin-top:auto 로 카드 높이가 달라도 버튼이 항상 바닥에 정렬된다. */
 .bookmarkBtnSm {
-  position: absolute;
-  bottom: var(--space-2);
-  right: var(--space-2);
-  width: 44px;
-  height: 44px;
+  align-self: flex-end;
+  margin-top: auto;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
@@ -422,6 +425,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
