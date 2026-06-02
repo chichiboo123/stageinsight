@@ -625,6 +625,24 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── 보기 방식(목록형/카드형) + 공연별 아코디언 접기 상태 ──
+  const [viewMode, setViewMode] = useState<'list' | 'card'>(() =>
+    (localStorage.getItem('stageinsight-insight-view') === 'card' ? 'card' : 'list'),
+  );
+  const changeView = useCallback((mode: 'list' | 'card') => {
+    setViewMode(mode);
+    try { localStorage.setItem('stageinsight-insight-view', mode); } catch { /* ignore */ }
+  }, []);
+  // 접힌 공연 그룹 key 집합 (기본: 모두 펼침)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapse = useCallback((key: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
   // ── AI 수업 아이디어 ──
   const [lessonOpen, setLessonOpen] = useState(false);
   const [lessonTitle, setLessonTitle] = useState('');
@@ -884,7 +902,25 @@ export function InsightPage({ onBack }: InsightPageProps) {
       <div className={styles.layout}>
         {/* 왼쪽: 공연별 그룹 (아이템 + 메모) */}
         <section className={styles.section}>
-          <h2 className="section-title">담은 항목</h2>
+          <div className={styles.sectionTitleRow}>
+            <h2 className="section-title" style={{ margin: 0 }}>담은 항목</h2>
+            {!isEmpty && (
+              <div className={styles.viewToggle} role="group" aria-label="보기 방식">
+                <button
+                  className={`${styles.viewToggleBtn} ${viewMode === 'list' ? styles.viewToggleActive : ''}`}
+                  onClick={() => changeView('list')}
+                  aria-pressed={viewMode === 'list'}
+                  title="목록형(바)으로 보기"
+                >☰ 목록</button>
+                <button
+                  className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.viewToggleActive : ''}`}
+                  onClick={() => changeView('card')}
+                  aria-pressed={viewMode === 'card'}
+                  title="카드형(폴더)으로 보기"
+                >🗂️ 카드</button>
+              </div>
+            )}
+          </div>
 
           {isEmpty ? (
             <div className="empty-state">
@@ -892,28 +928,48 @@ export function InsightPage({ onBack }: InsightPageProps) {
               <p>아직 담긴 항목이 없습니다.<br />공연, 성취기준, 영화, 도서에서 담기 버튼으로 담으세요.</p>
             </div>
           ) : (
-            <div className={styles.groupsContainer}>
-              {grouped.map(group => (
-                <div key={group.performanceId ?? 'ungrouped'} className={styles.performanceGroup}>
-                  {/* 그룹 헤더 */}
-                  <div className={styles.groupHeader}>
-                    <span style={{ fontSize: '18px' }}>🎭</span>
+            <div className={`${styles.groupsContainer} ${viewMode === 'card' ? styles.groupsGrid : ''}`}>
+              {grouped.map(group => {
+                const groupKey = group.performanceId ?? 'ungrouped';
+                const isCollapsed = collapsed.has(groupKey);
+                const groupCount = group.items.length + group.memos.length;
+                const perfThumb = group.items.find(i => i.type === 'performance')?.thumbnail;
+                return (
+                <div
+                  key={groupKey}
+                  className={`${styles.performanceGroup} ${viewMode === 'card' ? styles.folderCard : ''}`}
+                >
+                  {/* 그룹 헤더 (클릭 시 아코디언 토글) */}
+                  <div
+                    className={styles.groupHeader}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={!isCollapsed}
+                    onClick={() => toggleCollapse(groupKey)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse(groupKey); } }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <span className={styles.collapseChevron} aria-hidden="true">{isCollapsed ? '▶' : '▼'}</span>
+                    {viewMode === 'card' && perfThumb
+                      ? <img src={perfThumb} alt="" className={styles.folderThumb} />
+                      : <span style={{ fontSize: '18px' }}>🎭</span>}
                     <strong className={styles.groupTitle}>{group.performanceTitle ?? '공연 미지정'}</strong>
                     <span className="tag" style={{ fontSize: '11px' }}>
-                      {group.items.length + group.memos.length}개
+                      {groupCount}개
                     </span>
                     {group.items.some(i => i.type === 'performance' || i.type === 'standard') && (
                       <button
                         className="btn btn-outline"
                         style={{ marginLeft: 'auto', fontSize: '12px', padding: '4px 10px' }}
                         title="담긴 공연·성취기준·영화·도서로 작품 줄거리부터 AI 융합예술 수업까지 설계합니다."
-                        onClick={() => handleGenerateLesson(group)}
+                        onClick={e => { e.stopPropagation(); handleGenerateLesson(group); }}
                       >
                         ✨ AI 융합수업 설계
                       </button>
                     )}
                   </div>
 
+                  {!isCollapsed && (<div className={styles.groupBody}>
                   {/* 아이템 그리드 */}
                   {group.items.length > 0 && (
                     <div className={styles.itemGrid}>
@@ -1010,8 +1066,10 @@ export function InsightPage({ onBack }: InsightPageProps) {
                         ))}
                     </div>
                   )}
+                  </div>)}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
