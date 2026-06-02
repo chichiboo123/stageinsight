@@ -10,8 +10,7 @@
 .icon {
   width: 40px;
   height: 40px;
-  color: var(--color-accent-primary);
-  opacity: 0.6;
+  color: var(--color-danger);
 }
 
 .message {

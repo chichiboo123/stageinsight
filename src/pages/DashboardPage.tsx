@@ -524,7 +524,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         </button>
                       )}
                       {introError && (
-                        <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', marginTop: 6 }}>{introError}</p>
+                        <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 6 }}>{introError}</p>
                       )}
                       {intro && (
                         <div className="card" style={{ padding: 16, marginTop: 4, background: 'rgba(107,138,253,0.06)' }}>
@@ -683,7 +683,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 </div>
 
                 {currAiError && (
-                  <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', margin: '0 0 8px' }}>{currAiError}</p>
+                  <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: '0 0 8px' }}>{currAiError}</p>
                 )}
 
                 {/* 과정 필터 */}
@@ -847,7 +847,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   </div>
                 )}
                 {mediaCurateError && (
-                  <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', marginTop: 6 }}>{mediaCurateError}</p>
+                  <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 6 }}>{mediaCurateError}</p>
                 )}
               </section>
 

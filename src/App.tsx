@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { Header } from './components/layout/Header';
+import { StepProgress } from './components/layout/StepProgress';
 import { HomePage } from './pages/HomePage';
 import { MapPage } from './pages/MapPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -16,10 +17,10 @@ const HELP_CONTENT = [
   { step: '1', title: '학교 검색', desc: '홈 화면에서 학교 이름을 검색하세요. 유치원·초·중·고 모두 지원합니다.' },
   { step: '2', title: '공연장 선택', desc: '학교 주변 공연장이 자동으로 표시됩니다. 공연장 카드를 클릭하세요.' },
   { step: '3', title: '공연 선택', desc: '공연 대시보드에서 현재 공연 목록을 확인하고 원하는 공연을 선택하세요.' },
-  { step: '4', title: '교육과정 연계', desc: '공연 선택 시 성취기준·연계 영화·도서가 자동으로 표시됩니다. 학년군·교과 필터로 좁힐 수 있습니다.' },
-  { step: '5', title: '인사이트 바구니 담기', desc: '북마크 버튼으로 공연·성취기준·영화·도서를 인사이트 바구니에 담으세요.' },
-  { step: '6', title: '메모 작성', desc: '인사이트 바구니에서 공연별 메모를 작성하고 정리할 수 있습니다.' },
-  { step: '7', title: '내보내기', desc: '이미지·PDF 저장, 클립보드 복사, URL 공유가 가능합니다. 💾 버튼으로 JSON 파일 저장/불러오기도 지원합니다.' },
+  { step: '4', title: '교육과정 연계', desc: '공연 선택 시 성취기준·연계 영화·도서가 자동으로 표시됩니다. 학년군·교과 필터로 좁힐 수 있고, ✨ 버튼으로 AI 작품 소개·큐레이션을 받을 수 있습니다.' },
+  { step: '5', title: '인사이트 바구니 담기', desc: '북마크(🔖) 버튼으로 공연·성취기준·영화·도서를 인사이트 바구니에 담으세요.' },
+  { step: '6', title: 'AI 융합수업 설계', desc: '바구니의 공연 그룹에서 "✨ AI 융합수업 설계"를 누르면 작품 줄거리부터 학습목표·활동·발문까지 수업 초안을 만들어 메모로 저장합니다. (KOPIS에 줄거리가 없어도 AI가 작품 줄거리를 보완합니다.)' },
+  { step: '7', title: '메모 · 내보내기', desc: '공연별 메모를 작성하고, 이미지·PDF 저장, 클립보드 복사, URL 공유, 💾 JSON 저장/불러오기로 정리할 수 있습니다.' },
 ];
 
 function AppInner() {
@@ -97,6 +98,14 @@ function AppInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── 사용법 모달: Esc 키로 닫기 (접근성) ──
+  useEffect(() => {
+    if (!showHelp) return;
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setShowHelp(false); }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showHelp]);
+
   // ── 네비게이션 핸들러 ──
   function handleSchoolSelect(school: School) {
     selectSchool(school);
@@ -166,6 +175,18 @@ function AppInner() {
         onHelpClick={() => setShowHelp(true)}
       />
 
+      {/* 검색 절차 단계 표시기 — 홈/공연장/대시보드 흐름에서만 노출 */}
+      {page !== 'insight' && (
+        <StepProgress
+          hasSchool={!!state.selectedSchool}
+          hasVenue={!!state.selectedVenue}
+          onDashboard={page === 'dashboard'}
+          onStep1={handleGoToHome}
+          onStep2={handleGoToMap}
+          onStep3={() => state.selectedVenue && navigateTo('dashboard')}
+        />
+      )}
+
       <div style={{ flex: 1 }}>
         {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} onVenueSelect={handleVenueSelect} />}
         {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
@@ -208,6 +229,9 @@ function AppInner() {
           onClick={() => setShowHelp(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-modal-title"
             style={{
               background: 'var(--color-bg-primary)', borderRadius: '16px',
               padding: '32px', maxWidth: '520px', width: '100%', maxHeight: '90vh',
@@ -215,7 +239,7 @@ function AppInner() {
             }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px', color: 'var(--color-text-primary)' }}>
+            <h2 id="help-modal-title" style={{ fontSize: '22px', fontWeight: 700, marginBottom: '20px', color: 'var(--color-text-primary)' }}>
               📖 사용법
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -242,9 +266,11 @@ function AppInner() {
               borderLeft: '3px solid var(--color-accent-primary)',
             }}>
               <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.7' }}>
-                본 서비스의 성취기준 및 연계 자료(영화, 도서) 추천 기능에는 별도의 AI 기술이 포함되어 있지 않습니다.
-                이는 작품명의 핵심 키워드를 기반으로 한 매칭 시스템으로, 기계적인 추출 특성상 추천 결과가 교육적 의도와
-                완벽히 일치하지 않을 수 있습니다. 수업 설계 시 반드시 내용을 재확인하시고 단순 참고용으로 활용해 주시기 바랍니다.
+                기본 성취기준·연계 자료(영화·도서) 추천은 작품명의 핵심 키워드를 기반으로 한 매칭으로, 기계적 추출
+                특성상 교육적 의도와 완벽히 일치하지 않을 수 있습니다. ✨ 표시가 있는 AI 기능(작품 소개·큐레이션·융합수업
+                설계)은 생성형 AI가 작성하므로 사실과 다르거나 부정확할 수 있으며, 특히 KOPIS에 줄거리가 없는 작품은 AI가
+                일반 지식으로 줄거리를 보완하므로 실제 공연과 다를 수 있습니다. 수업 설계 시 반드시 내용을 재확인하시고
+                참고용으로 활용해 주세요.
               </p>
             </div>
 

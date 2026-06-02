@@ -107,7 +107,7 @@
 .dropdownError {
   padding: var(--space-4) var(--space-5);
   font-size: var(--font-size-sm);
-  color: var(--color-accent-primary);
+  color: var(--color-danger);
 }
 
 .dropdownItem {

@@ -117,16 +117,23 @@ export async function lessonIdeas(body, apiKey) {
 
   const system =
     '너는 한국 초·중·고 교사의 융합예술수업 설계를 돕는 교육 컨설턴트다. ' +
-    '아래 순서로 교사에게 실질적으로 도움이 되는 종합 답변을 작성한다.\n' +
-    '① 작품 이해: 제공된 줄거리·기본정보(장르·관람연령·러닝타임·공연기간)·공연장·티켓 금액을 ' +
-    'workSummary에 자연스러운 2~4문장으로 정리한다. ★주어진 사실만 사용하고, 없는 정보(가격·공연장 등)는 ' +
-    '추측하거나 지어내지 말고 생략한다.\n' +
-    '② 학습 가치: 이 작품을 통해 학생이 무엇을 배울 수 있는지(교과 지식·핵심역량·정서·태도·진로 등)를 ' +
-    'learningValue에 구체적 항목으로 종합 제시한다.\n' +
-    '③ 융합 수업 설계: 공연을 중심에 두고 연계 영화·도서를 매체로 엮어 하나의 흐름이 있는 수업' +
+    '교사가 공연 관람을 의미 있는 수업으로 연결하도록, 아래 순서로 실질적인 종합 답변을 한국어로 작성한다.\n' +
+    '① 작품 줄거리(plotSummary): 학생·교사가 작품을 이해하도록 줄거리와 핵심 내용을 4~6문장으로 친절하게 설명한다. ' +
+    '제공된 "줄거리"가 있으면 그것을 우선 근거로 삼는다. "줄거리"가 비어 있거나 빈약하면, ' +
+    '제목으로 식별되는 잘 알려진 작품(원작 동화·소설·고전·유명 뮤지컬/연극 등)일 경우 너의 일반 지식을 활용해 ' +
+    '대표적인 이야기 전개·주요 인물·핵심 메시지를 재구성해 제공한다. ' +
+    '확신이 어렵거나 동명의 여러 작품이 있을 수 있으면 단정하지 말고 "제목·장르로 미루어 ~로 보입니다"처럼 신중하게 쓰고, ' +
+    '이 경우 문장 끝에 "(실제 공연 내용과 다를 수 있으니 확인이 필요합니다)"를 덧붙인다. ' +
+    '종교 포교·선정성·폭력성은 배제하고 학생 눈높이로 쓴다. plotSummary는 절대 비워 두지 않는다.\n' +
+    '② 작품 기본 정보(workSummary): 장르·관람연령·러닝타임·공연기간·공연장·티켓 금액 등 "주어진 사실만" ' +
+    '1~2문장으로 정리한다. ★없는 정보(가격·공연장 등)는 추측하거나 지어내지 말고 생략한다. ' +
+    '(줄거리·작품 내용은 ①에서 다루므로, 여기서는 사실 정보 위주로 간결하게.)\n' +
+    '③ 학습 가치(learningValue): 이 작품을 통해 학생이 무엇을 배울 수 있는지(교과 지식·핵심역량·정서·태도·진로 등)를 ' +
+    '구체적 항목으로 종합 제시한다.\n' +
+    '④ 융합 수업 설계: 공연을 중심에 두고 연계 영화·도서를 매체로 엮어 하나의 흐름이 있는 수업' +
     '(공연 감상 → 매체 연계 → 표현·창작 활동)을 설계한다. 성취기준의 학년 수준에 맞춰 난이도를 조정하고, ' +
     '한국 교실에서 바로 적용 가능하게 쓴다. 영화·도서는 공연 주제를 확장·심화하는 연결고리로 구체적으로 활용한다.\n' +
-    '모든 내용은 한국어로, 과장 없이 신뢰성 있게 작성한다.';
+    '모든 내용은 과장 없이 신뢰성 있게 작성한다.';
 
   const user = JSON.stringify({
     중심공연: performanceTitle,
@@ -144,8 +151,9 @@ export async function lessonIdeas(body, apiKey) {
     type: T.OBJECT,
     properties: {
       title: { type: T.STRING },                 // 수업 제목
-      workSummary: { type: T.STRING },           // ① 작품 소개·줄거리·기본정보 요약
-      learningValue: { type: T.ARRAY, items: { type: T.STRING } }, // ② 이 작품으로 가능한 학습(종합)
+      plotSummary: { type: T.STRING },           // ① 작품 줄거리·핵심 내용 (KOPIS 없으면 AI 지식 기반)
+      workSummary: { type: T.STRING },           // ② 작품 기본 정보(사실) 요약
+      learningValue: { type: T.ARRAY, items: { type: T.STRING } }, // ③ 이 작품으로 가능한 학습(종합)
       overview: { type: T.STRING },              // 수업 개요(2~3문장)
       gradeBand: { type: T.STRING },             // 권장 학년군
       convergenceFocus: { type: T.STRING },      // 공연·영화·도서를 잇는 융합 포인트
@@ -166,7 +174,7 @@ export async function lessonIdeas(body, apiKey) {
       discussionQuestions: { type: T.ARRAY, items: { type: T.STRING } },
       assessment: { type: T.STRING },
     },
-    required: ['overview', 'objectives', 'activities', 'discussionQuestions'],
+    required: ['plotSummary', 'overview', 'objectives', 'activities', 'discussionQuestions'],
   };
 
   const { json, model } = await callGeminiJSON({
@@ -176,6 +184,7 @@ export async function lessonIdeas(body, apiKey) {
   const arr = (a, n) => (a ?? []).map(String).map(s => s.trim()).filter(Boolean).slice(0, n);
   return {
     title: json?.title ? String(json.title) : undefined,
+    plotSummary: json?.plotSummary ? String(json.plotSummary) : undefined,
     workSummary: json?.workSummary ? String(json.workSummary) : undefined,
     learningValue: arr(json?.learningValue, 8),
     overview: String(json?.overview ?? ''),
@@ -204,9 +213,12 @@ export async function introducePerformance(body, apiKey) {
   const synopsis = String(body?.synopsis ?? '').slice(0, 900);
 
   const system =
-    '너는 공연을 교육적으로 소개하는 해설가다. 주어진 정보를 바탕으로 ' +
-    '학생과 교사가 이해하기 쉽게 작품을 소개한다. 사실을 지어내지 말고, 주어진 줄거리에서 ' +
-    '추론 가능한 범위로만 작성한다. 정보가 부족하면 일반적·신중한 표현을 쓴다. ' +
+    '너는 공연을 교육적으로 소개하는 해설가다. 학생과 교사가 이해하기 쉽게 작품을 소개한다. ' +
+    'summary에는 작품의 줄거리·핵심 내용을 포함해 3~5문장으로 쓴다. ' +
+    '제공된 "줄거리"가 있으면 그것을 우선 근거로 삼고, 비어 있거나 빈약하면 제목으로 식별되는 ' +
+    '잘 알려진 작품일 경우 일반 지식을 활용해 대표적 이야기를 재구성한다. ' +
+    '확신이 어려우면 단정하지 말고 신중한 표현("~로 보입니다")을 쓰고, 추측이 섞였다면 ' +
+    '"실제 공연 내용과 다를 수 있습니다"를 덧붙인다. 사실 정보(가격·출연진 등)는 지어내지 않는다. ' +
     '종교 포교성·선정성·폭력성 내용은 배제하고 초·중·고 학생에게 적합하게 쓴다. 모두 한국어로.';
 
   const user = JSON.stringify({ 제목: title, 장르: genre, 줄거리: synopsis });
@@ -263,6 +275,7 @@ export async function curateMedia(body, apiKey) {
     '너는 공연 연계 수업 자료를 큐레이션하는 사서·영화 교사다. ' +
     '먼저 주어진 "공연"의 줄거리·장르·키워드·관람연령을 근거로 작품의 핵심 주제·정서·소재·' +
     '학습 개념을 깊이 파악한다. (제목의 표면 단어가 아니라 작품의 "내용"을 이해한다.) ' +
+    '줄거리가 비어 있으면 제목으로 식별되는 잘 알려진 작품의 일반 지식을 활용해 내용을 추정한다. ' +
     '파악한 핵심 주제는 themes에 3~6개의 짧은 구로 적는다. ' +
     '그 이해를 바탕으로, 후보 목록에서 작품 "내용"과 교육적으로 연결되는 영화·도서를 골라 랭킹한다. ' +
     '연관성은 주제·정서·소재·메시지의 일치를 기준으로 하며, 단순히 제목 단어가 겹치는 것은 배제한다. ' +

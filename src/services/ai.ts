@@ -17,7 +17,7 @@ import type {
 } from '../types';
 import { setAIStatus } from './aiStatus';
 
-const CACHE_PREFIX = 'ai-cache:v3:';
+const CACHE_PREFIX = 'ai-cache:v4:';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30일
 
 function cacheGet<T>(key: string): T | null {

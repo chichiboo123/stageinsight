@@ -96,7 +96,8 @@ export interface LessonActivity {
 
 export interface LessonPlan {
   title?: string;
-  workSummary?: string;        // 작품 소개·줄거리·기본정보 요약 (AI)
+  plotSummary?: string;        // 작품 줄거리·핵심 내용 (KOPIS 줄거리 또는 AI 지식 기반)
+  workSummary?: string;        // 작품 기본 정보(사실) 요약 (AI)
   learningValue?: string[];    // 이 작품으로 가능한 학습(종합)
   overview: string;
   gradeBand?: string;

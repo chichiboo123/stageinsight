@@ -33,7 +33,7 @@
 
   --color-text-primary:     #1E3A5F;
   --color-text-secondary:   #3B5A8A;
-  --color-text-muted:       #7EA8CC;
+  --color-text-muted:       #506E96;
   --color-text-on-accent:   #FFFFFF;
 
   --color-border:           #BFDBFE;
@@ -65,7 +65,7 @@
 
   --color-text-primary:     #14532D;
   --color-text-secondary:   #166534;
-  --color-text-muted:       #6BAF84;
+  --color-text-muted:       #41815A;
   --color-text-on-accent:   #FFFFFF;
 
   --color-border:           #BBF7D0;
@@ -97,7 +97,7 @@
 
   --color-text-primary:     #713F12;
   --color-text-secondary:   #92400E;
-  --color-text-muted:       #B89A60;
+  --color-text-muted:       #8A6C2C;
   --color-text-on-accent:   #FFFFFF;
 
   --color-border:           #FDE68A;
@@ -129,7 +129,7 @@
 
   --color-text-primary:     #881337;
   --color-text-secondary:   #9F1239;
-  --color-text-muted:       #C07080;
+  --color-text-muted:       #A1495B;
   --color-text-on-accent:   #FFFFFF;
 
   --color-border:           #FECDD3;
@@ -148,6 +148,28 @@
 
 /* ---------- 3. 공통 Design Tokens ---------- */
 :root {
+  /* ── KRDS 시맨틱 컬러 (상태 전달용 — 명도대비 WCAG AA 충족) ── */
+  --color-danger:      #D92D20;   /* 오류·경고·삭제 */
+  --color-danger-bg:   #FEF3F2;
+  --color-success:     #067647;   /* 성공·완료 */
+  --color-success-bg:  #ECFDF3;
+  --color-warning:     #B54708;   /* 주의 */
+  --color-warning-bg:  #FFFAEB;
+  --color-info:        #175CD3;   /* 정보·안내 */
+  --color-info-bg:     #EFF4FF;
+
+  /* 보조 배경 */
+  --color-bg-tertiary: #E5E7EB;
+
+  /* KRDS 포커스 링 (키보드 접근성) */
+  --color-focus:       #1D4ED8;
+
+  /* 그림자 단계 (일부 모듈이 참조) */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.14);
+  --shadow-xl: 0 24px 56px rgba(0, 0, 0, 0.20);
+
   /* Spacing scale */
   --space-1:  4px;
   --space-2:  8px;
@@ -238,8 +260,27 @@ button {
   font-family: inherit;
   cursor: pointer;
   border: none;
-  outline: none;
   background: transparent;
+}
+
+/* ---------- 접근성: KRDS 키보드 포커스 링 ----------
+   마우스 클릭에는 표시되지 않고(:focus-visible), 키보드 탐색 시에만
+   뚜렷한 포커스 표시를 제공해 WCAG 2.4.7(포커스 가시성)을 충족한다. */
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* 모션 민감 사용자 배려 (WCAG 2.3.3 / vestibular) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 input,
@@ -321,6 +362,7 @@ p {
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-6);
+  min-height: 40px;            /* KRDS 기본(M) 크기 — 충분한 클릭/터치 영역 */
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -332,6 +374,19 @@ p {
     transform var(--transition-fast),
     box-shadow var(--transition-fast);
 }
+
+/* 비활성 상태 — KRDS 공통 */
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 크기 변형 */
+.btn-sm { min-height: 32px; padding: var(--space-2) var(--space-4); font-size: var(--font-size-xs); }
+.btn-lg { min-height: 52px; padding: var(--space-4) var(--space-8); font-size: var(--font-size-base); }
 
 .btn-primary {
   background: var(--color-accent-primary);
@@ -363,6 +418,26 @@ p {
 .btn-ghost:hover {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
+}
+
+/* 보조(secondary) — 채워진 연한 배경 */
+.btn-secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1.5px solid var(--color-border);
+}
+.btn-secondary:hover {
+  background: var(--color-accent-light);
+  border-color: var(--color-accent-primary);
+}
+
+/* 위험(danger) — 삭제 등 파괴적 동작 */
+.btn-danger {
+  background: var(--color-danger);
+  color: #fff;
+}
+.btn-danger:hover {
+  filter: brightness(0.92);
 }
 
 /* Material Symbols */
