@@ -1,17 +1,20 @@
 /**
  * AI 핸들러 (서버 전용 순수 함수)
+ * ────────────────────────────────────────────────────────────
  * - 각 핸들러는 요청 body(object)와 apiKey를 받아 결과 object를 반환한다.
- * - 입력은 클라이언트에서 1차 정제(키워드 프리필터 등)된 소량 데이터만 받아
+ * - 입력은 클라이언트에서 1차 정제(키워드 프리필터·후보 압축 등)된 소량 데이터만 받아
  *   토큰 사용을 최소화한다.
+ * - 모든 호출은 callGeminiJSON(다중 모델 폴백)을 거치며, 실제 사용된 모델 ID를
+ *   결과에 `_model`로 실어 보낸다 → 클라이언트 '배터리' 표시에 사용.
  * - 실패 시 throw → 호출 측(함수/미들웨어)이 적절한 상태코드로 응답.
  */
 
 import { callGeminiJSON } from './gemini.mjs';
 
-const SCHEMA_TYPE = { STRING: 'STRING', ARRAY: 'ARRAY', OBJECT: 'OBJECT', INTEGER: 'INTEGER' };
+const T = { STRING: 'STRING', ARRAY: 'ARRAY', OBJECT: 'OBJECT', INTEGER: 'INTEGER' };
 
 /* ============================================================
-   1) 성취기준 재정렬/큐레이션 (Phase 1)
+   1) 성취기준 재정렬/큐레이션 (수업 연계용)
    - 클라이언트가 키워드로 1차 추린 후보(최대 ~40개)만 전달
    - Gemini가 의미적 적합도로 상위 N개 선별 + 한 줄 근거 제공
    ============================================================ */
@@ -20,9 +23,8 @@ export async function rerankCurriculum(body, apiKey) {
   const candidates = Array.isArray(body?.candidates) ? body.candidates : [];
   const topN = Math.min(Math.max(Number(body?.topN) || 12, 1), 24);
 
-  if (candidates.length === 0) return { selections: [] };
+  if (candidates.length === 0) return { selections: [], _model: null };
 
-  // 후보를 최대 40개로 제한(토큰 통제), 본문은 압축해 전달
   const trimmed = candidates.slice(0, 40).map(c => ({
     id: String(c.id),
     g: c.grade ?? '',
@@ -32,7 +34,7 @@ export async function rerankCurriculum(body, apiKey) {
 
   const system =
     '너는 한국 교사를 돕는 교육과정 연계 전문가다. ' +
-    '주어진 공연과 성취기준 후보 목록을 보고, 공연 관람 후 수업으로 연결하기에 ' +
+    '주어진 공연과 성취기준 후보 목록을 보고, 공연 관람을 수업으로 연결하기에 ' +
     '의미적으로 가장 적합한 성취기준을 선별한다. 단순 단어 일치가 아니라 주제·정서·' +
     '핵심 가치의 연관성을 기준으로 판단한다. 특정 학년군에 치우치지 않게 다양하게 고른다. ' +
     '근거(reason)는 한국어 한 문장(40자 이내)으로 간결하게 쓴다. ' +
@@ -50,16 +52,16 @@ export async function rerankCurriculum(body, apiKey) {
   });
 
   const schema = {
-    type: SCHEMA_TYPE.OBJECT,
+    type: T.OBJECT,
     properties: {
       selections: {
-        type: SCHEMA_TYPE.ARRAY,
+        type: T.ARRAY,
         items: {
-          type: SCHEMA_TYPE.OBJECT,
+          type: T.OBJECT,
           properties: {
-            id: { type: SCHEMA_TYPE.STRING },
-            reason: { type: SCHEMA_TYPE.STRING },
-            relevance: { type: SCHEMA_TYPE.INTEGER }, // 1~5
+            id: { type: T.STRING },
+            reason: { type: T.STRING },
+            relevance: { type: T.INTEGER }, // 1~5
           },
           required: ['id', 'reason', 'relevance'],
         },
@@ -68,18 +70,12 @@ export async function rerankCurriculum(body, apiKey) {
     required: ['selections'],
   };
 
-  const result = await callGeminiJSON({
-    apiKey,
-    system,
-    user,
-    schema,
-    temperature: 0.2,
-    maxOutputTokens: 1200,
+  const { json, model } = await callGeminiJSON({
+    apiKey, system, user, schema, temperature: 0.2, maxOutputTokens: 1200,
   });
 
-  // 방어적 정규화 + 후보 id 화이트리스트 검증
   const valid = new Set(trimmed.map(c => c.id));
-  const selections = (result?.selections ?? [])
+  const selections = (json?.selections ?? [])
     .filter(s => s && valid.has(String(s.id)))
     .slice(0, topN)
     .map(s => ({
@@ -88,17 +84,17 @@ export async function rerankCurriculum(body, apiKey) {
       relevance: Math.min(Math.max(Number(s.relevance) || 3, 1), 5),
     }));
 
-  return { selections };
+  return { selections, _model: model };
 }
 
 /* ============================================================
-   2) 수업 아이디어 생성 (Phase 2)
-   - 인사이트 바구니의 공연 + 성취기준 + 연계자료를 묶어
-     수업 설계 초안을 생성
+   2) 융합예술 수업 아이디어 생성
+   - 공연을 중심에 두고, 연계 영화·도서를 엮은 '융합예술수업' 설계 초안
    ============================================================ */
 export async function lessonIdeas(body, apiKey) {
   const performanceTitle = String(body?.performanceTitle ?? '').slice(0, 120);
   const genre = String(body?.genre ?? '').slice(0, 20);
+  const synopsis = String(body?.synopsis ?? '').slice(0, 500);
   const standards = (Array.isArray(body?.standards) ? body.standards : [])
     .slice(0, 8)
     .map(s => ({
@@ -107,115 +103,203 @@ export async function lessonIdeas(body, apiKey) {
       sub: s.subject ?? '',
       t: String(s.content ?? '').slice(0, 100),
     }));
-  const extras = (Array.isArray(body?.extras) ? body.extras : [])
-    .slice(0, 10)
-    .map(e => ({ type: e.type, title: String(e.title ?? '').slice(0, 60) }));
+  const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 6).map(m => String(m).slice(0, 60));
+  const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 6).map(b => String(b).slice(0, 60));
 
   const system =
-    '너는 한국 초·중·고 교사의 수업 설계를 돕는 교육 컨설턴트다. ' +
-    '공연 관람을 교육과정 성취기준과 연계한 구체적이고 실행 가능한 수업 아이디어를 제안한다. ' +
-    '제시된 성취기준의 학년 수준에 맞춰 활동 난이도를 조정하고, 한국 교실 현실에서 ' +
-    '바로 적용 가능하게 쓴다. 모든 내용은 한국어로 작성한다. 과장 없이 신뢰성 있게 쓴다.';
+    '너는 한국 초·중·고 교사의 융합예술수업 설계를 돕는 교육 컨설턴트다. ' +
+    '제시된 "공연"을 중심에 두고, 연계 영화·도서를 매체로 엮어 ' +
+    '하나의 흐름이 있는 융합 수업(공연 감상 → 매체 연계 → 표현·창작 활동)을 설계한다. ' +
+    '성취기준의 학년 수준에 맞춰 활동 난이도를 조정하고, 한국 교실에서 바로 적용 가능하게 쓴다. ' +
+    '영화·도서는 공연 주제를 확장·심화하는 연결고리로 구체적으로 활용한다. ' +
+    '모든 내용은 한국어로, 과장 없이 신뢰성 있게 작성한다.';
 
   const user = JSON.stringify({
-    공연: performanceTitle,
+    중심공연: performanceTitle,
     장르: genre,
+    줄거리: synopsis,
     성취기준: standards,
-    연계자료: extras,
+    연계영화: movies,
+    연계도서: books,
   });
 
   const schema = {
-    type: SCHEMA_TYPE.OBJECT,
+    type: T.OBJECT,
     properties: {
-      overview: { type: SCHEMA_TYPE.STRING },        // 수업 개요(2~3문장)
-      gradeBand: { type: SCHEMA_TYPE.STRING },        // 권장 학년군
-      objectives: { type: SCHEMA_TYPE.ARRAY, items: { type: SCHEMA_TYPE.STRING } },
+      title: { type: T.STRING },                 // 수업 제목
+      overview: { type: T.STRING },              // 수업 개요(2~3문장)
+      gradeBand: { type: T.STRING },             // 권장 학년군
+      convergenceFocus: { type: T.STRING },      // 공연·영화·도서를 잇는 융합 포인트
+      objectives: { type: T.ARRAY, items: { type: T.STRING } },
       activities: {
-        type: SCHEMA_TYPE.ARRAY,
+        type: T.ARRAY,
         items: {
-          type: SCHEMA_TYPE.OBJECT,
+          type: T.OBJECT,
           properties: {
-            title: { type: SCHEMA_TYPE.STRING },
-            description: { type: SCHEMA_TYPE.STRING },
-            duration: { type: SCHEMA_TYPE.STRING },
+            title: { type: T.STRING },
+            description: { type: T.STRING },
+            duration: { type: T.STRING },
+            linkedMedia: { type: T.STRING },      // 이 활동에서 활용하는 영화/도서/공연
           },
           required: ['title', 'description'],
         },
       },
-      discussionQuestions: { type: SCHEMA_TYPE.ARRAY, items: { type: SCHEMA_TYPE.STRING } },
-      assessment: { type: SCHEMA_TYPE.STRING },
+      discussionQuestions: { type: T.ARRAY, items: { type: T.STRING } },
+      assessment: { type: T.STRING },
     },
     required: ['overview', 'objectives', 'activities', 'discussionQuestions'],
   };
 
-  const result = await callGeminiJSON({
-    apiKey,
-    system,
-    user,
-    schema,
-    temperature: 0.6,
-    maxOutputTokens: 2048,
+  const { json, model } = await callGeminiJSON({
+    apiKey, system, user, schema, temperature: 0.6, maxOutputTokens: 2300,
   });
 
   return {
-    overview: String(result?.overview ?? ''),
-    gradeBand: String(result?.gradeBand ?? ''),
-    objectives: (result?.objectives ?? []).map(String).slice(0, 6),
-    activities: (result?.activities ?? []).slice(0, 6).map(a => ({
+    title: json?.title ? String(json.title) : undefined,
+    overview: String(json?.overview ?? ''),
+    gradeBand: String(json?.gradeBand ?? ''),
+    convergenceFocus: json?.convergenceFocus ? String(json.convergenceFocus) : undefined,
+    objectives: (json?.objectives ?? []).map(String).slice(0, 6),
+    activities: (json?.activities ?? []).slice(0, 6).map(a => ({
       title: String(a?.title ?? ''),
       description: String(a?.description ?? ''),
       duration: a?.duration ? String(a.duration) : undefined,
+      linkedMedia: a?.linkedMedia ? String(a.linkedMedia) : undefined,
     })),
-    discussionQuestions: (result?.discussionQuestions ?? []).map(String).slice(0, 8),
-    assessment: result?.assessment ? String(result.assessment) : undefined,
+    discussionQuestions: (json?.discussionQuestions ?? []).map(String).slice(0, 8),
+    assessment: json?.assessment ? String(json.assessment) : undefined,
+    _model: model,
   };
 }
 
 /* ============================================================
-   3) 공연 의미 보강 (Phase 3)
-   - 시놉시스에서 주제/정서 키워드 + 검색어 생성
-   - 이미 연결된 TMDB/Naver 검색을 더 정확하게 구동하기 위한 1회 호출
+   3) 작품 상세 소개 (AI)
+   - KOPIS 줄거리를 바탕으로 학생 눈높이의 풍부한 작품 소개 생성
    ============================================================ */
-export async function enrichPerformance(body, apiKey) {
+export async function introducePerformance(body, apiKey) {
   const title = String(body?.title ?? '').slice(0, 120);
   const genre = String(body?.genre ?? '').slice(0, 20);
-  const synopsis = String(body?.synopsis ?? '').slice(0, 800);
+  const synopsis = String(body?.synopsis ?? '').slice(0, 900);
 
   const system =
-    '너는 공연 콘텐츠를 분석해 교육 연계 검색을 돕는 큐레이터다. ' +
-    '주어진 공연의 핵심 주제·정서·가치를 뽑고, 이를 영화/도서 검색에 적합한 ' +
-    '구체적 검색어로 변환한다. 검색어는 너무 일반적인 단어(예: 음악, 이야기)를 피하고 ' +
-    '작품 주제를 잘 드러내는 2~4어절 구를 사용한다. 종교 포교성 콘텐츠는 배제한다. ' +
-    '모든 출력은 한국어. 초·중·고 학생에게 적합한 것만 고른다.';
+    '너는 공연을 교육적으로 소개하는 해설가다. 주어진 정보를 바탕으로 ' +
+    '학생과 교사가 이해하기 쉽게 작품을 소개한다. 사실을 지어내지 말고, 주어진 줄거리에서 ' +
+    '추론 가능한 범위로만 작성한다. 정보가 부족하면 일반적·신중한 표현을 쓴다. ' +
+    '종교 포교성·선정성·폭력성 내용은 배제하고 초·중·고 학생에게 적합하게 쓴다. 모두 한국어로.';
 
   const user = JSON.stringify({ 제목: title, 장르: genre, 줄거리: synopsis });
 
   const schema = {
-    type: SCHEMA_TYPE.OBJECT,
+    type: T.OBJECT,
     properties: {
-      themes: { type: SCHEMA_TYPE.ARRAY, items: { type: SCHEMA_TYPE.STRING } },          // 주제어
-      curriculumKeywords: { type: SCHEMA_TYPE.ARRAY, items: { type: SCHEMA_TYPE.STRING } }, // 성취기준 매칭용
-      movieQueries: { type: SCHEMA_TYPE.ARRAY, items: { type: SCHEMA_TYPE.STRING } },      // 영화 검색어
-      bookQueries: { type: SCHEMA_TYPE.ARRAY, items: { type: SCHEMA_TYPE.STRING } },       // 도서 검색어
+      summary: { type: T.STRING },                                  // 작품 소개 3~5문장
+      themes: { type: T.ARRAY, items: { type: T.STRING } },         // 핵심 주제
+      watchPoints: { type: T.ARRAY, items: { type: T.STRING } },    // 관람 포인트
+      educationalValue: { type: T.STRING },                         // 교육적 의의
+      discussionStarters: { type: T.ARRAY, items: { type: T.STRING } }, // 관람 후 이야깃거리
     },
-    required: ['themes', 'curriculumKeywords', 'movieQueries', 'bookQueries'],
+    required: ['summary', 'themes', 'watchPoints'],
   };
 
-  const result = await callGeminiJSON({
-    apiKey,
-    system,
-    user,
-    schema,
-    temperature: 0.4,
-    maxOutputTokens: 800,
+  const { json, model } = await callGeminiJSON({
+    apiKey, system, user, schema, temperature: 0.5, maxOutputTokens: 1200,
   });
 
-  const clean = (arr, n) => [...new Set((arr ?? []).map(s => String(s).trim()).filter(Boolean))].slice(0, n);
+  const arr = (a, n) => (a ?? []).map(String).map(s => s.trim()).filter(Boolean).slice(0, n);
   return {
-    themes: clean(result?.themes, 8),
-    curriculumKeywords: clean(result?.curriculumKeywords, 12),
-    movieQueries: clean(result?.movieQueries, 6),
-    bookQueries: clean(result?.bookQueries, 6),
+    summary: String(json?.summary ?? ''),
+    themes: arr(json?.themes, 8),
+    watchPoints: arr(json?.watchPoints, 6),
+    educationalValue: json?.educationalValue ? String(json.educationalValue) : undefined,
+    discussionStarters: arr(json?.discussionStarters, 6),
+    _model: model,
+  };
+}
+
+/* ============================================================
+   4) 영화·도서 추천 큐레이션 (정확도 개선의 핵심)
+   - 클라이언트가 기본 검색(TMDB/네이버)으로 모은 후보를 전달
+   - Gemini가 공연과 교육적으로 연관된 것만 선별·랭킹 + 근거 제공
+   - 더 나은 결과를 찾기 위한 정밀 검색어(추가 쿼리)도 함께 제안
+   ============================================================ */
+export async function curateMedia(body, apiKey) {
+  const performance = body?.performance ?? {};
+  const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 24).map(m => ({
+    id: String(m.id),
+    t: String(m.title ?? '').slice(0, 60),
+    o: String(m.overview ?? '').slice(0, 140),
+  }));
+  const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 24).map(b => ({
+    isbn: String(b.isbn),
+    t: String(b.title ?? '').slice(0, 60),
+    o: String(b.description ?? '').slice(0, 140),
+  }));
+
+  const system =
+    '너는 공연 연계 수업 자료를 큐레이션하는 사서·영화 교사다. ' +
+    '주어진 "공연"과 교육적으로 연관성이 높은 영화·도서만 후보 목록에서 골라 랭킹한다. ' +
+    '연관성은 주제·정서·소재의 일치를 기준으로 하며, 단순히 제목 단어가 겹치는 것은 배제한다. ' +
+    '학생에게 부적합하거나 무관한 후보는 제외한다. 근거(reason)는 공연과의 연결점을 ' +
+    '한국어 한 문장(40자 이내)으로 쓴다. 반드시 후보의 id/isbn만 사용한다. ' +
+    '또한 후보가 빈약할 때를 대비해, 이 공연에 더 적합한 작품을 찾기 위한 ' +
+    '정밀 검색어(movieQueries/bookQueries)를 한국어로 2~4개씩 제안한다. ' +
+    '검색어는 너무 일반적인 단어(음악, 이야기 등)를 피하고 주제를 잘 드러내는 2~4어절 구로 쓴다.';
+
+  const user = JSON.stringify({
+    공연: {
+      제목: performance.title ?? '',
+      장르: performance.genre ?? '',
+      줄거리: String(performance.synopsis ?? '').slice(0, 500),
+    },
+    영화후보: movies,
+    도서후보: books,
+  });
+
+  const schema = {
+    type: T.OBJECT,
+    properties: {
+      movieSelections: {
+        type: T.ARRAY,
+        items: {
+          type: T.OBJECT,
+          properties: { id: { type: T.STRING }, reason: { type: T.STRING } },
+          required: ['id', 'reason'],
+        },
+      },
+      bookSelections: {
+        type: T.ARRAY,
+        items: {
+          type: T.OBJECT,
+          properties: { isbn: { type: T.STRING }, reason: { type: T.STRING } },
+          required: ['isbn', 'reason'],
+        },
+      },
+      movieQueries: { type: T.ARRAY, items: { type: T.STRING } },
+      bookQueries: { type: T.ARRAY, items: { type: T.STRING } },
+    },
+    required: ['movieSelections', 'bookSelections'],
+  };
+
+  const { json, model } = await callGeminiJSON({
+    apiKey, system, user, schema, temperature: 0.3, maxOutputTokens: 1500,
+  });
+
+  const validMovie = new Set(movies.map(m => m.id));
+  const validBook = new Set(books.map(b => b.isbn));
+  const arr = (a, n) => [...new Set((a ?? []).map(s => String(s).trim()).filter(Boolean))].slice(0, n);
+
+  return {
+    movieSelections: (json?.movieSelections ?? [])
+      .filter(s => s && validMovie.has(String(s.id)))
+      .slice(0, 12)
+      .map(s => ({ id: String(s.id), reason: String(s.reason ?? '').slice(0, 60) })),
+    bookSelections: (json?.bookSelections ?? [])
+      .filter(s => s && validBook.has(String(s.isbn)))
+      .slice(0, 12)
+      .map(s => ({ isbn: String(s.isbn), reason: String(s.reason ?? '').slice(0, 60) })),
+    movieQueries: arr(json?.movieQueries, 4),
+    bookQueries: arr(json?.bookQueries, 4),
+    _model: model,
   };
 }
 
@@ -223,5 +307,6 @@ export async function enrichPerformance(body, apiKey) {
 export const HANDLERS = {
   'curriculum-rerank': rerankCurriculum,
   'lesson-ideas': lessonIdeas,
-  'enrich-performance': enrichPerformance,
+  'introduce-performance': introducePerformance,
+  'curate-media': curateMedia,
 };

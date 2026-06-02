@@ -7,7 +7,8 @@ import { useMediaRecommendations } from '../hooks/useMediaRecommendations';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { PosterModal } from '../components/common/PosterModal';
-import type { CurriculumType, Movie, Book } from '../types';
+import { aiIntroducePerformance } from '../services/ai';
+import type { CurriculumType, Movie, Book, PerformanceIntro } from '../types';
 import styles from './DashboardPage.module.css';
 
 const CURRICULUM_FILTERS: { label: string; value: CurriculumType }[] = [
@@ -296,7 +297,15 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const [gradeFilter, setGradeFilter] = useState<string[]>([]);
   const [subjectFilter, setSubjectFilter] = useState<string[]>([]);
 
-  useEffect(() => { setGradeFilter([]); setSubjectFilter([]); }, [selectedPerformance?.id]);
+  // AI 작품 소개 (버튼 트리거)
+  const [intro, setIntro] = useState<PerformanceIntro | null>(null);
+  const [introLoading, setIntroLoading] = useState(false);
+  const [introError, setIntroError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGradeFilter([]); setSubjectFilter([]);
+    setIntro(null); setIntroError(null); setIntroLoading(false);
+  }, [selectedPerformance?.id]);
 
   const { performances, loading: perfLoading, error: perfError } = usePerformances(selectedVenue);
   const { performance: detailedPerformance, loading: detailLoading } = usePerformanceDetail(
@@ -304,7 +313,23 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   );
   const displayPerformance = detailedPerformance ?? selectedPerformance;
 
-  const { matches, loading: currLoading, activeFilters, setFilters, aiLoading: currAiLoading, aiCurated } = useCurriculumMatch(displayPerformance);
+  const {
+    matches, loading: currLoading, activeFilters, setFilters,
+    runAICuration, aiLoading: currAiLoading, aiCurated, aiError: currAiError,
+  } = useCurriculumMatch(displayPerformance);
+
+  const handleIntroduce = useCallback(async () => {
+    if (!displayPerformance) return;
+    setIntroLoading(true);
+    setIntroError(null);
+    try {
+      setIntro(await aiIntroducePerformance(displayPerformance));
+    } catch (err) {
+      setIntroError(err instanceof Error ? `작품 소개 생성 실패: ${err.message}` : '작품 소개 생성에 실패했습니다.');
+    } finally {
+      setIntroLoading(false);
+    }
+  }, [displayPerformance]);
 
   const availableGrades = useMemo(() => {
     const grades = [...new Set(matches.map(m => m.standard.grade))];
@@ -322,8 +347,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
     return gradeOk && subjectOk;
   }), [matches, gradeFilter, subjectFilter]);
 
-  const { movies, books, moviesLoading, booksLoading, moviesError, booksError } =
-    useMediaRecommendations(displayPerformance);
+  const {
+    movies, books, moviesLoading, booksLoading, moviesError, booksError,
+    curate: curateMedia, curating: mediaCurating, curated: mediaCurated,
+    curateError: mediaCurateError, canCurate: canCurateMedia,
+  } = useMediaRecommendations(displayPerformance);
 
   const handlePosterClick = useCallback((src: string) => {
     setPosterModalSrc(src);
@@ -481,6 +509,64 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                     <SynopsisBox text={displayPerformance!.synopsis} />
                   )}
 
+                  {/* AI 작품 상세 소개 (버튼 트리거) */}
+                  {!detailLoading && (displayPerformance!.synopsis || displayPerformance!.title) && (
+                    <div style={{ marginTop: 10 }}>
+                      {!intro && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ fontSize: 13 }}
+                          onClick={handleIntroduce}
+                          disabled={introLoading}
+                          title="AI가 작품을 학생 눈높이로 자세히 소개합니다."
+                        >
+                          {introLoading ? '✨ 작품 소개 생성 중…' : '✨ AI 작품 소개'}
+                        </button>
+                      )}
+                      {introError && (
+                        <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', marginTop: 6 }}>{introError}</p>
+                      )}
+                      {intro && (
+                        <div className="card" style={{ padding: 16, marginTop: 4, background: 'rgba(107,138,253,0.06)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ fontSize: 14 }}>✨ AI 작품 소개</strong>
+                            <button className="btn btn-ghost" style={{ fontSize: 12, padding: '2px 8px' }} onClick={() => setIntro(null)}>접기</button>
+                          </div>
+                          <p style={{ fontSize: 14, lineHeight: 1.6, margin: '8px 0' }}>{intro.summary}</p>
+                          {intro.themes.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, margin: '6px 0' }}>
+                              {intro.themes.map(t => <span key={t} className="tag" style={{ fontSize: 11 }}>{t}</span>)}
+                            </div>
+                          )}
+                          {intro.watchPoints.length > 0 && (
+                            <>
+                              <h5 style={{ margin: '10px 0 4px', fontSize: 13 }}>👀 관람 포인트</h5>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.5 }}>
+                                {intro.watchPoints.map((w, i) => <li key={i}>{w}</li>)}
+                              </ul>
+                            </>
+                          )}
+                          {intro.educationalValue && (
+                            <p style={{ fontSize: 13, lineHeight: 1.55, marginTop: 10 }}>
+                              <strong>🎓 교육적 의의 </strong>{intro.educationalValue}
+                            </p>
+                          )}
+                          {intro.discussionStarters.length > 0 && (
+                            <>
+                              <h5 style={{ margin: '10px 0 4px', fontSize: 13 }}>💬 관람 후 이야깃거리</h5>
+                              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.5 }}>
+                                {intro.discussionStarters.map((q, i) => <li key={i}>{q}</li>)}
+                              </ul>
+                            </>
+                          )}
+                          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 10 }}>
+                            AI 생성 결과는 참고용이며 부정확할 수 있습니다.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* 출연진 */}
                   {!detailLoading && displayPerformance!.cast && displayPerformance!.cast.length > 0 && (
                     <div className={styles.castBox}>
@@ -565,12 +651,29 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       >✨ AI 큐레이션</span>
                     )}
                   </h3>
-                  {matches.length > 0 && (
-                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                      {currAiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {matches.length > 0 && (
+                      <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                        {currAiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
+                      </span>
+                    )}
+                    {matches.length > 0 && !aiCurated && (
+                      <button
+                        className="btn btn-outline"
+                        style={{ fontSize: 12, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                        onClick={runAICuration}
+                        disabled={currAiLoading}
+                        title="키워드 결과를 AI가 의미 기반으로 재정렬하고 연계 근거를 제시합니다."
+                      >
+                        {currAiLoading ? '✨ 큐레이션 중…' : '✨ AI 큐레이션'}
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                {currAiError && (
+                  <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', margin: '0 0 8px' }}>{currAiError}</p>
+                )}
 
                 {/* 과정 필터 */}
                 <div className={styles.filterGroup}>
@@ -705,9 +808,32 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 </div>
               </section>
 
+              {/* 영화·도서 AI 큐레이션 컨트롤 (버튼 트리거) */}
+              <section className={styles.section}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: 13 }}
+                    onClick={curateMedia}
+                    disabled={!canCurateMedia || mediaCurating || mediaCurated}
+                    title="공연과 연관성 높은 영화·도서만 AI가 선별·랭킹하고, 정밀 검색으로 보강합니다."
+                  >
+                    {mediaCurating ? '✨ 추천 큐레이션 중…' : mediaCurated ? '✨ AI 큐레이션 완료' : '✨ AI로 추천 정확도 높이기'}
+                  </button>
+                  {mediaCurated && (
+                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                      공연 연계 관점으로 큐레이션된 결과입니다.
+                    </span>
+                  )}
+                </div>
+                {mediaCurateError && (
+                  <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', marginTop: 6 }}>{mediaCurateError}</p>
+                )}
+              </section>
+
               {/* 연계 영화 */}
               <section className={styles.section}>
-                <h3 className="section-title">연계 추천 영화</h3>
+                <h3 className="section-title">연계 추천 영화{mediaCurated && ' ✨'}</h3>
                 {moviesLoading && <LoadingSpinner size="sm" />}
                 {moviesError && <ErrorMessage message={moviesError} />}
                 {!moviesLoading && !moviesError && movies.length === 0 && (
@@ -745,6 +871,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                               ))}
                             </div>
                           )}
+                          {movie.aiReason && (
+                            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                              💡 {movie.aiReason}
+                            </p>
+                          )}
                         </div>
                         <button
                           className={styles.bookmarkBtnSm}
@@ -773,7 +904,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
 
               {/* 연계 도서 */}
               <section className={styles.section}>
-                <h3 className="section-title">연계 추천 도서</h3>
+                <h3 className="section-title">연계 추천 도서{mediaCurated && ' ✨'}</h3>
                 {booksLoading && <LoadingSpinner size="sm" />}
                 {booksError && <ErrorMessage message={booksError} />}
                 {!booksLoading && !booksError && books.length === 0 && (
@@ -808,6 +939,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             <div className={styles.mediaRating}>
                               {book.price.toLocaleString()}원
                             </div>
+                          )}
+                          {book.aiReason && (
+                            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                              💡 {book.aiReason}
+                            </p>
                           )}
                         </div>
                         <button

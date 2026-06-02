@@ -259,10 +259,11 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
 // ---------- AI 수업 아이디어: 텍스트 변환 (메모 저장/복사용) ----------
 function lessonPlanToText(plan: LessonPlan, performanceTitle: string): string {
   const lines: string[] = [];
-  lines.push(`✨ AI 수업 아이디어 — ${performanceTitle}`);
+  lines.push(`✨ AI 융합예술 수업 — ${plan.title || performanceTitle}`);
   if (plan.gradeBand) lines.push(`권장 학년군: ${plan.gradeBand}`);
   lines.push('');
   if (plan.overview) { lines.push(`[개요] ${plan.overview}`); lines.push(''); }
+  if (plan.convergenceFocus) { lines.push(`[융합 포인트] ${plan.convergenceFocus}`); lines.push(''); }
   if (plan.objectives?.length) {
     lines.push('[학습 목표]');
     plan.objectives.forEach(o => lines.push(`· ${o}`));
@@ -271,7 +272,7 @@ function lessonPlanToText(plan: LessonPlan, performanceTitle: string): string {
   if (plan.activities?.length) {
     lines.push('[수업 활동]');
     plan.activities.forEach((a, i) => {
-      lines.push(`${i + 1}. ${a.title}${a.duration ? ` (${a.duration})` : ''}`);
+      lines.push(`${i + 1}. ${a.title}${a.duration ? ` (${a.duration})` : ''}${a.linkedMedia ? ` [연계: ${a.linkedMedia}]` : ''}`);
       lines.push(`   ${a.description}`);
     });
     lines.push('');
@@ -310,13 +311,13 @@ function LessonPlanModal({
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-          <h3 style={{ margin: 0, fontSize: '17px' }}>✨ AI 수업 아이디어<br /><small style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{performanceTitle}</small></h3>
+          <h3 style={{ margin: 0, fontSize: '17px' }}>✨ AI 융합예술 수업<br /><small style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{plan?.title || performanceTitle}</small></h3>
           <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }}>×</button>
         </div>
 
         {loading && (
           <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            AI가 수업 아이디어를 구성하고 있어요… ⏳
+            공연을 중심으로 영화·도서를 엮은 융합 수업을 구성하고 있어요… ⏳
           </p>
         )}
         {error && (
@@ -331,6 +332,13 @@ function LessonPlanModal({
               <span className="tag" style={{ marginBottom: 8, display: 'inline-block' }}>권장 학년군: {plan.gradeBand}</span>
             )}
             {plan.overview && <p style={{ marginTop: 4 }}>{plan.overview}</p>}
+
+            {plan.convergenceFocus && (
+              <div style={{ background: 'rgba(107,138,253,0.08)', borderRadius: 8, padding: '8px 12px', margin: '8px 0' }}>
+                <strong style={{ fontSize: 13 }}>🔗 융합 포인트 </strong>
+                <span style={{ fontSize: 13 }}>{plan.convergenceFocus}</span>
+              </div>
+            )}
 
             {plan.objectives?.length > 0 && (
               <>
@@ -348,6 +356,7 @@ function LessonPlanModal({
                   <div key={i} style={{ marginBottom: 10 }}>
                     <strong>{i + 1}. {a.title}</strong>
                     {a.duration && <span className="tag" style={{ marginLeft: 6, fontSize: 11 }}>{a.duration}</span>}
+                    {a.linkedMedia && <span className="tag" style={{ marginLeft: 4, fontSize: 11, background: 'rgba(107,138,253,0.15)' }}>🔗 {a.linkedMedia}</span>}
                     <p style={{ margin: '2px 0 0' }}>{a.description}</p>
                   </div>
                 ))}
@@ -420,16 +429,18 @@ export function InsightPage({ onBack }: InsightPageProps) {
         const [subject, grade] = (i.subtitle ?? '').split(' · ');
         return { id: i.title, grade: (grade ?? '').trim(), subject: (subject ?? '').trim(), content: i.detail ?? '' };
       });
-    const extras = group.items
-      .filter(i => i.type !== 'standard')
-      .map(i => ({ type: i.type, title: i.title }));
+    const movies = group.items.filter(i => i.type === 'movie').map(i => i.title);
+    const books = group.items.filter(i => i.type === 'book').map(i => i.title);
+    const synopsis = group.items.find(i => i.type === 'performance')?.detail ?? '';
 
     try {
       const plan = await aiLessonIdeas({
         performanceTitle: title,
+        synopsis,
         standards,
-        extras,
-        cacheKey: `${group.performanceId ?? 'none'}:${standards.map(s => s.id).join(',')}:${extras.length}`,
+        movies,
+        books,
+        cacheKey: `${group.performanceId ?? 'none'}:${standards.map(s => s.id).join(',')}:m${movies.length}:b${books.length}`,
       });
       setLessonPlan(plan);
     } catch (err) {
@@ -644,10 +655,10 @@ export function InsightPage({ onBack }: InsightPageProps) {
                       <button
                         className="btn btn-outline"
                         style={{ marginLeft: 'auto', fontSize: '12px', padding: '4px 10px' }}
-                        title="담긴 성취기준·자료로 AI 수업 아이디어를 생성합니다."
+                        title="담긴 공연·성취기준·영화·도서로 AI 융합예술 수업을 설계합니다."
                         onClick={() => handleGenerateLesson(group)}
                       >
-                        ✨ AI 수업 아이디어
+                        ✨ AI 융합수업 설계
                       </button>
                     )}
                   </div>
