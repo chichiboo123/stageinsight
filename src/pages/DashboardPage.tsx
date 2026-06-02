@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { PosterModal } from '../components/common/PosterModal';
 import { aiIntroducePerformance } from '../services/ai';
+import { fetchWikiSummary, namuwikiUrl, wikipediaSearchUrl, type WikiSummary } from '../services/wiki';
 import type { CurriculumType, Movie, Book, PerformanceIntro } from '../types';
 import styles from './DashboardPage.module.css';
 
@@ -139,6 +140,93 @@ function ImageModal({ images, title, onClose }: { images: string[]; title: strin
               style={{ width: '100%', height: 'auto', borderRadius: 'var(--radius-sm)', display: 'block' }} />
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- 작품 정보(위키백과) 모달 — AI 미사용 ----------
+function WikiModal({
+  title, data, loading, error, onClose,
+}: {
+  title: string;
+  data: WikiSummary | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, [onClose]);
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000,
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        role="dialog" aria-modal="true" aria-label={`${title} 작품 정보`}
+        style={{
+          background: 'var(--color-bg-primary)', borderRadius: '16px',
+          padding: '24px', maxWidth: '560px', width: '100%', maxHeight: '85vh',
+          overflow: 'auto', boxShadow: 'var(--shadow-xl)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
+            📖 작품 정보
+          </h3>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: 20, padding: '4px 10px' }} aria-label="닫기">×</button>
+        </div>
+
+        {loading && (
+          <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            위키백과에서 정보를 찾는 중이에요… ⏳
+          </p>
+        )}
+
+        {!loading && data && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              {data.thumbnail && (
+                <img src={data.thumbnail} alt="" style={{ width: 96, borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+              )}
+              <div>
+                <strong style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-text-primary)' }}>{data.title}</strong>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.75, marginTop: 6, whiteSpace: 'pre-wrap' }}>
+                  {data.extract}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && !data && (
+          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
+            {error ?? '위키백과에서 이 작품의 문서를 찾지 못했습니다.'} 아래 링크에서 직접 검색해 보세요.
+          </p>
+        )}
+
+        {/* 외부 출처 바로가기 (나무위키는 스크래핑 불가 → 링크로 안내) */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+          {data?.url && (
+            <a className="btn btn-secondary btn-sm" href={data.url} target="_blank" rel="noopener noreferrer">위키백과에서 보기 →</a>
+          )}
+          {!data?.url && (
+            <a className="btn btn-secondary btn-sm" href={wikipediaSearchUrl(title)} target="_blank" rel="noopener noreferrer">위키백과 검색 →</a>
+          )}
+          <a className="btn btn-secondary btn-sm" href={namuwikiUrl(title)} target="_blank" rel="noopener noreferrer">나무위키에서 보기 →</a>
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
+          출처: 위키백과 · 나무위키. 동명의 다른 작품일 수 있으니 공연 정보와 함께 확인해 주세요.
+        </p>
       </div>
     </div>
   );
@@ -287,8 +375,15 @@ function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void })
 
 // ================================================================
 export function DashboardPage({ onGoToMap }: DashboardPageProps) {
-  const { state, selectVenue, selectPerformance, addInsightItem } = useApp();
+  const { state, selectVenue, selectPerformance, addInsightItem, removeInsightItem } = useApp();
   const { selectedVenue, selectedPerformance } = state;
+
+  // 바구니에 담긴 항목 집합 (담기 버튼의 '담김' 상태 표시 + 토글용)
+  const savedKeys = useMemo(
+    () => new Set(state.insightBoard.items.map(i => `${i.type}:${i.id}`)),
+    [state.insightBoard.items],
+  );
+  const isSaved = useCallback((type: string, id: string) => savedKeys.has(`${type}:${id}`), [savedKeys]);
 
   const [showImageModal, setShowImageModal] = useState(false);
   const [posterModalSrc, setPosterModalSrc] = useState<string | null>(null);
@@ -302,9 +397,16 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const [introLoading, setIntroLoading] = useState(false);
   const [introError, setIntroError] = useState<string | null>(null);
 
+  // 작품 정보(위키백과) 팝업 — AI 미사용
+  const [wikiOpen, setWikiOpen] = useState(false);
+  const [wikiData, setWikiData] = useState<WikiSummary | null>(null);
+  const [wikiLoading, setWikiLoading] = useState(false);
+  const [wikiError, setWikiError] = useState<string | null>(null);
+
   useEffect(() => {
     setGradeFilter([]); setSubjectFilter([]);
     setIntro(null); setIntroError(null); setIntroLoading(false);
+    setWikiOpen(false); setWikiData(null); setWikiError(null); setWikiLoading(false);
   }, [selectedPerformance?.id]);
 
   const { performances, loading: perfLoading, error: perfError } = usePerformances(selectedVenue);
@@ -317,6 +419,23 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
     matches, loading: currLoading, activeFilters, setFilters,
     runAICuration, aiLoading: currAiLoading, aiCurated, aiError: currAiError,
   } = useCurriculumMatch(displayPerformance);
+
+  const handleShowWiki = useCallback(async () => {
+    if (!displayPerformance) return;
+    setWikiOpen(true);
+    setWikiError(null);
+    setWikiData(null);
+    setWikiLoading(true);
+    try {
+      const data = await fetchWikiSummary(displayPerformance.title);
+      setWikiData(data);
+      if (!data) setWikiError('위키백과에서 이 작품의 문서를 찾지 못했습니다.');
+    } catch {
+      setWikiError('작품 정보를 불러오지 못했습니다.');
+    } finally {
+      setWikiLoading(false);
+    }
+  }, [displayPerformance]);
 
   const handleIntroduce = useCallback(async () => {
     if (!displayPerformance) return;
@@ -509,18 +628,24 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                     <SynopsisBox text={displayPerformance!.synopsis} />
                   )}
 
-                  {/* AI 작품 상세 소개 (버튼 트리거) */}
-                  {!detailLoading && (displayPerformance!.synopsis || displayPerformance!.title) && (
-                    <div style={{ marginTop: 10 }}>
+                  {/* 작품 소개: 위키백과(무료) + AI 심화(선택) */}
+                  {!detailLoading && displayPerformance!.title && (
+                    <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleShowWiki}
+                        title="위키백과·나무위키 정보를 팝업으로 보여줍니다. (AI 미사용)"
+                      >
+                        📖 작품 정보
+                      </button>
                       {!intro && (
                         <button
-                          className="btn btn-outline"
-                          style={{ fontSize: 13 }}
+                          className="btn btn-outline btn-sm"
                           onClick={handleIntroduce}
                           disabled={introLoading}
-                          title="AI가 작품을 학생 눈높이로 자세히 소개합니다."
+                          title="AI가 작품을 학생 눈높이로 교육적으로 해설합니다. (AI 호출)"
                         >
-                          {introLoading ? '✨ 작품 소개 생성 중…' : '✨ AI 작품 소개'}
+                          {introLoading ? '✨ AI 해설 생성 중…' : '✨ AI 교육 해설'}
                         </button>
                       )}
                       {introError && (
@@ -622,9 +747,12 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   )}
 
                   <button
-                    className={styles.bookmarkBtn}
-                    title="인사이트 바구니에 담기"
-                    onClick={() => addInsightItem({
+                    className={`${styles.bookmarkBtn} ${isSaved('performance', displayPerformance!.id) ? styles.bookmarkSaved : ''}`}
+                    title={isSaved('performance', displayPerformance!.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                    aria-pressed={isSaved('performance', displayPerformance!.id)}
+                    onClick={() => isSaved('performance', displayPerformance!.id)
+                      ? removeInsightItem(displayPerformance!.id)
+                      : addInsightItem({
                       type: 'performance',
                       id: displayPerformance!.id,
                       title: displayPerformance!.title,
@@ -647,7 +775,9 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       savedAt: new Date().toISOString(),
                     })}
                   >
-                    <span className="material-symbols-outlined">bookmark_add</span>
+                    <span className="material-symbols-outlined">
+                      {isSaved('performance', displayPerformance!.id) ? 'bookmark_added' : 'bookmark_add'}
+                    </span>
                   </button>
                 </div>
               </section>
@@ -806,9 +936,12 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         </div>
                       )}
                       <button
-                        className={styles.bookmarkBtnSm}
-                        title="인사이트 바구니에 담기"
-                        onClick={() => addInsightItem({
+                        className={`${styles.bookmarkBtnSm} ${isSaved('standard', standard.id) ? styles.bookmarkSaved : ''}`}
+                        title={isSaved('standard', standard.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                        aria-pressed={isSaved('standard', standard.id)}
+                        onClick={() => isSaved('standard', standard.id)
+                          ? removeInsightItem(standard.id)
+                          : addInsightItem({
                           type: 'standard',
                           id: standard.id,
                           title: standard.id,
@@ -819,7 +952,9 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           savedAt: new Date().toISOString(),
                         })}
                       >
-                        <span className="material-symbols-outlined">bookmark_add</span>
+                        <span className="material-symbols-outlined">
+                          {isSaved('standard', standard.id) ? 'bookmark_added' : 'bookmark_add'}
+                        </span>
                       </button>
                     </div>
                   ))}
@@ -909,10 +1044,12 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           )}
                         </div>
                         <button
-                          className={styles.bookmarkBtnSm}
-                          title="인사이트 바구니에 담기"
+                          className={`${styles.bookmarkBtnSm} ${isSaved('movie', String(movie.id)) ? styles.bookmarkSaved : ''}`}
+                          title={isSaved('movie', String(movie.id)) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                          aria-pressed={isSaved('movie', String(movie.id))}
                           onClick={e => {
                             e.stopPropagation();
+                            if (isSaved('movie', String(movie.id))) { removeInsightItem(String(movie.id)); return; }
                             addInsightItem({
                               type: 'movie',
                               id: String(movie.id),
@@ -925,7 +1062,9 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          <span className="material-symbols-outlined">bookmark_add</span>
+                          <span className="material-symbols-outlined">
+                            {isSaved('movie', String(movie.id)) ? 'bookmark_added' : 'bookmark_add'}
+                          </span>
                         </button>
                       </div>
                     ))}
@@ -982,10 +1121,12 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           )}
                         </div>
                         <button
-                          className={styles.bookmarkBtnSm}
-                          title="인사이트 바구니에 담기"
+                          className={`${styles.bookmarkBtnSm} ${isSaved('book', book.isbn) ? styles.bookmarkSaved : ''}`}
+                          title={isSaved('book', book.isbn) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                          aria-pressed={isSaved('book', book.isbn)}
                           onClick={e => {
                             e.stopPropagation();
+                            if (isSaved('book', book.isbn)) { removeInsightItem(book.isbn); return; }
                             addInsightItem({
                               type: 'book',
                               id: book.isbn,
@@ -999,7 +1140,9 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          <span className="material-symbols-outlined">bookmark_add</span>
+                          <span className="material-symbols-outlined">
+                            {isSaved('book', book.isbn) ? 'bookmark_added' : 'bookmark_add'}
+                          </span>
                         </button>
                       </div>
                     ))}
@@ -1010,6 +1153,17 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
           )}
         </main>
       </div>
+
+      {/* 작품 정보(위키백과) 모달 */}
+      {wikiOpen && (
+        <WikiModal
+          title={displayPerformance?.title ?? ''}
+          data={wikiData}
+          loading={wikiLoading}
+          error={wikiError}
+          onClose={() => setWikiOpen(false)}
+        />
+      )}
 
       {/* 포스터 크게 보기 모달 */}
       {posterModalSrc && (

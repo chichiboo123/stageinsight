@@ -654,16 +654,32 @@ export function InsightPage({ onBack }: InsightPageProps) {
   }
 
   async function handleShare() {
-    const url = shareAsUrl(insightBoard);
+    const flash = (msg: string, ms = 3000) => {
+      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
+      setShareMsg(msg);
+      shareTimerRef.current = setTimeout(() => setShareMsg(''), ms);
+    };
+
+    // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (실패 시 기존 긴 링크로 폴백)
+    let url: string;
+    try {
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(insightBoard),
+      });
+      if (!res.ok) throw new Error('share failed');
+      const { id } = await res.json() as { id: string };
+      url = `${window.location.origin}${window.location.pathname}?s=${id}`;
+    } catch {
+      url = shareAsUrl(insightBoard); // 폴백: 긴 base64 링크
+    }
+
     try {
       await navigator.clipboard.writeText(url);
-      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
-      setShareMsg('✅ 공유 URL 복사됨!');
-      shareTimerRef.current = setTimeout(() => setShareMsg(''), 3000);
+      flash('✅ 공유 URL 복사됨!');
     } catch {
-      if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
-      setShareMsg('❌ 복사 실패');
-      shareTimerRef.current = setTimeout(() => setShareMsg(''), 2500);
+      flash('❌ 복사 실패', 2500);
     }
   }
 
@@ -807,9 +823,13 @@ export function InsightPage({ onBack }: InsightPageProps) {
                           )}
                           <div className={styles.itemBody}>
                             <span className={styles.itemType}>{TYPE_TEXT[item.type] ?? item.type}</span>
-                            <strong className={styles.itemTitle}>{item.title}</strong>
+                            <strong className={item.type === 'standard' ? styles.itemTitleWrap : styles.itemTitle}>{item.title}</strong>
                             {item.subtitle && (
                               <small className={styles.itemSubtitle}>{item.subtitle}</small>
+                            )}
+                            {/* 성취기준은 풀텍스트를 바로 보이도록 인라인 표시 */}
+                            {item.type === 'standard' && item.detail && (
+                              <p className={styles.itemStandardText}>{item.detail}</p>
                             )}
                           </div>
                           <button

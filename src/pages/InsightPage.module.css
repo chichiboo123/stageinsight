@@ -125,9 +125,9 @@
 .insightItem {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
   cursor: pointer;
   transition: box-shadow 0.15s, border-color 0.15s, background 0.15s;
 }
@@ -204,6 +204,22 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 성취기준 코드 제목(짧음) — 줄바꿈 허용 */
+.itemTitleWrap {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.35;
+}
+
+/* 성취기준 풀텍스트 — 바구니에서 바로 보이도록 인라인 표시 */
+.itemStandardText {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: 2px;
 }
 
 .removeBtn {

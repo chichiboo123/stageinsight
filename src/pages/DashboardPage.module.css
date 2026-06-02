@@ -391,6 +391,14 @@
   border-color: var(--color-accent-primary);
 }
 
+/* 이미 담긴 상태 — 채워진 표시로 피드백 제공 */
+.bookmarkSaved,
+.bookmarkSaved:hover {
+  background: var(--color-accent-primary);
+  color: var(--color-text-on-accent);
+  border-color: var(--color-accent-primary);
+}
+
 /* 미디어 카드 */
 .mediaCard {
   min-width: 150px;

@@ -142,10 +142,12 @@ export async function lessonIdeas(body, apiKey) {
   const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 6).map(m => String(m).slice(0, 60));
   const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 6).map(b => String(b).slice(0, 60));
 
-  // ① 웹 검색으로 정확한 줄거리를 먼저 확보(best-effort) → 구조화 수업 설계 호출에 주입
-  const groundedPlot = await fetchGroundedPlot(apiKey, {
-    title: performanceTitle, genre, venue, period, synopsis,
-  });
+  // ① 줄거리 확보: KOPIS 줄거리가 충분하면 추가 호출 없이 그대로 사용하고,
+  //    비어 있거나 빈약할 때만 웹 검색 그라운딩을 1회 수행한다(AI 호출 절감).
+  const synopsisLen = synopsis.replace(/\s/g, '').length;
+  const groundedPlot = synopsisLen < 40
+    ? await fetchGroundedPlot(apiKey, { title: performanceTitle, genre, venue, period, synopsis })
+    : '';
 
   const system =
     '너는 한국 초·중·고 교사의 융합예술수업 설계를 돕는 교육 컨설턴트다. ' +

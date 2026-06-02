@@ -31,6 +31,13 @@
   status = 200
   force = true
 
+# 인사이트 바구니 공유 단축 링크 (Netlify Blobs 저장)
+[[redirects]]
+  from = "/api/share"
+  to = "/.netlify/functions/share"
+  status = 200
+  force = true
+
 # React SPA 새로고침 폴백
 [[redirects]]
   from = "/*"
