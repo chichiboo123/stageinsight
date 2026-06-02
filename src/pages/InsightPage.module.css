@@ -16,6 +16,11 @@
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.backText {
+  margin-left: 4px;
 }
 
 .subtitle {
@@ -382,6 +387,12 @@
 @media (max-width: 600px) {
   .page {
     padding-top: var(--space-5);
+  }
+  .title {
+    font-size: var(--font-size-xl);
+  }
+  .backText {
+    display: none;   /* 모바일에서는 ← 아이콘만 */
   }
   .exportSection {
     flex-direction: column;

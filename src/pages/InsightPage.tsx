@@ -677,8 +677,9 @@ export function InsightPage({ onBack }: InsightPageProps) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
             {onBack && (
-              <button className="btn btn-ghost" onClick={onBack} style={{ flexShrink: 0 }}>
-                ← 뒤로가기
+              <button className="btn btn-ghost" onClick={onBack} style={{ flexShrink: 0 }} aria-label="뒤로가기">
+                <span aria-hidden="true">←</span>
+                <span className={styles.backText}>뒤로가기</span>
               </button>
             )}
             <h1 className={styles.title}>🛒 인사이트 바구니</h1>
