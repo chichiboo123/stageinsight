@@ -7,6 +7,7 @@ import { HomePage } from './pages/HomePage';
 import { MapPage } from './pages/MapPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InsightPage } from './pages/InsightPage';
+import { decodeBoardGzip, isValidBoard } from './services/shareCodec';
 import type { School, Venue, InsightBoard } from './types';
 
 export type Page = 'home' | 'map' | 'dashboard' | 'insight';
@@ -58,6 +59,16 @@ function AppInner() {
           }
         })
         .catch(() => { /* 실패 시 빈 바구니 유지 */ })
+        .finally(() => window.history.replaceState({}, '', window.location.pathname));
+      return;
+    }
+
+    // ── 압축 공유 링크(?z=<gzip-base64url>): 클라이언트에서 복원 ──
+    const gz = params.get('z');
+    if (gz) {
+      decodeBoardGzip(gz)
+        .then((decoded) => { if (isValidBoard(decoded)) loadInsightBoard(decoded); })
+        .catch(() => { /* 손상된 링크는 무시 */ })
         .finally(() => window.history.replaceState({}, '', window.location.pathname));
       return;
     }

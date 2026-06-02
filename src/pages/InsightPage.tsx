@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { aiLessonIdeas } from '../services/ai';
+import { encodeBoardGzip, encodeBoardBase64, supportsCompression } from '../services/shareCodec';
 import type { InsightBoard, InsightItem, InsightMemo, InsightPerformanceMeta, LessonPlan } from '../types';
 import styles from './InsightPage.module.css';
 
@@ -109,13 +110,20 @@ async function copyToClipboard(board: InsightBoard): Promise<boolean> {
   }
 }
 
+/** 최종 폴백: 비압축 base64url 링크(?share=). gzip 미지원 브라우저에서만 사용. */
 function shareAsUrl(board: InsightBoard): string {
-  // URL-safe base64: +→-, /→_, 패딩(=) 제거 → URL 인코딩 불필요
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(board))))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-  return `${window.location.origin}${window.location.pathname}?share=${encoded}`;
+  return `${window.location.origin}${window.location.pathname}?share=${encodeBoardBase64(board)}`;
+}
+
+/** gzip 압축 링크(?z=). 서버 단축링크 실패 시 폴백 — 긴 링크를 크게 단축한다. */
+async function shareAsCompressedUrl(board: InsightBoard): Promise<string> {
+  if (!supportsCompression()) return shareAsUrl(board);
+  try {
+    const z = await encodeBoardGzip(board);
+    return `${window.location.origin}${window.location.pathname}?z=${z}`;
+  } catch {
+    return shareAsUrl(board);
+  }
 }
 
 function exportAsImage(board: InsightBoard) {
@@ -660,7 +668,9 @@ export function InsightPage({ onBack }: InsightPageProps) {
       shareTimerRef.current = setTimeout(() => setShareMsg(''), ms);
     };
 
-    // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (실패 시 기존 긴 링크로 폴백)
+    // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (가장 짧음)
+    // 2) 서버 실패 시 gzip 압축 링크(?z=)로 폴백 — 긴 링크를 크게 단축
+    // 3) gzip 미지원 브라우저는 비압축 ?share= 링크 최종 폴백
     let url: string;
     try {
       const res = await fetch('/api/share', {
@@ -672,7 +682,7 @@ export function InsightPage({ onBack }: InsightPageProps) {
       const { id } = await res.json() as { id: string };
       url = `${window.location.origin}${window.location.pathname}?s=${id}`;
     } catch {
-      url = shareAsUrl(insightBoard); // 폴백: 긴 base64 링크
+      url = await shareAsCompressedUrl(insightBoard); // 폴백: gzip 압축 링크
     }
 
     try {
