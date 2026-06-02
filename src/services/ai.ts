@@ -17,7 +17,7 @@ import type {
 } from '../types';
 import { setAIStatus } from './aiStatus';
 
-const CACHE_PREFIX = 'ai-cache:v4:';
+const CACHE_PREFIX = 'ai-cache:v5:';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30일
 
 function cacheGet<T>(key: string): T | null {
@@ -168,10 +168,15 @@ export async function aiIntroducePerformance(performance: Performance): Promise<
   const cached = cacheGet<PerformanceIntro>(cacheKey);
   if (cached) return cached;
 
+  const fmt = (d?: string) => (d && d.length >= 8 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}` : d ?? '');
   const result = await postAI<PerformanceIntro>('introduce-performance', '작품 소개', {
     title: performance.title,
     genre: performance.genre,
     synopsis: performance.synopsis ?? '',
+    // 웹 검색 그라운딩으로 "바로 그 공연"을 특정하기 위한 단서
+    venue: performance.venue ?? '',
+    period: `${fmt(performance.startDate)} ~ ${fmt(performance.endDate)}`,
+    cast: performance.cast ?? [],
   });
   cacheSet(cacheKey, result);
   return result;

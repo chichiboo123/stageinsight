@@ -9,9 +9,36 @@
  * - 실패 시 throw → 호출 측(함수/미들웨어)이 적절한 상태코드로 응답.
  */
 
-import { callGeminiJSON } from './_gemini.mjs';
+import { callGeminiJSON, SEARCH_TOOL } from './_gemini.mjs';
 
-const T = { STRING: 'STRING', ARRAY: 'ARRAY', OBJECT: 'OBJECT', INTEGER: 'INTEGER' };
+const T = { STRING: 'STRING', ARRAY: 'ARRAY', OBJECT: 'OBJECT', INTEGER: 'INTEGER', BOOLEAN: 'BOOLEAN' };
+
+/**
+ * 웹 검색 그라운딩으로 "정확한" 작품 줄거리를 가져온다 (best-effort).
+ * 작품명 + 공연장 + 공연기간으로 실제 공연을 특정해 동명이작 혼동을 방지한다.
+ * 실패하면 빈 문자열을 반환해 호출 측이 우아하게 폴백하도록 한다.
+ */
+async function fetchGroundedPlot(apiKey, { title, genre, venue, period, synopsis }) {
+  try {
+    const system =
+      '너는 공연 정보 조사원이다. Google 검색으로 아래 "이 공연"을 특정해 정확한 줄거리를 찾는다. ' +
+      '작품명과 공연장·공연기간을 조합해 검색하고, 위키백과·나무위키·예매처(인터파크/NOL 티켓 등) 등 ' +
+      '신뢰할 수 있는 출처를 참고한다. 제목만 같은 다른 작품과 혼동하지 않는다. ' +
+      'KOPIS 줄거리가 있으면 교차 검증한다. 특정이 어려우면 지어내지 말고 plot은 빈 문자열로 둔다. ' +
+      '학생 눈높이의 한국어로, 마크다운/코드펜스 없이 JSON 객체 하나만 출력한다: ' +
+      '{"plot": "줄거리 4~6문장(불확실하면 빈 문자열)", "verified": true/false}';
+    const user = JSON.stringify({
+      이공연: { 제목: title, 장르: genre, 공연장: venue, 공연기간: period },
+      KOPIS_줄거리: String(synopsis ?? '').slice(0, 700),
+    });
+    const { json } = await callGeminiJSON({
+      apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.3, maxOutputTokens: 1200,
+    });
+    return String(json?.plot ?? '').trim();
+  } catch {
+    return '';
+  }
+}
 
 /* ============================================================
    1) 성취기준 재정렬/큐레이션 (수업 연계용)
@@ -115,13 +142,18 @@ export async function lessonIdeas(body, apiKey) {
   const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 6).map(m => String(m).slice(0, 60));
   const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 6).map(b => String(b).slice(0, 60));
 
+  // ① 웹 검색으로 정확한 줄거리를 먼저 확보(best-effort) → 구조화 수업 설계 호출에 주입
+  const groundedPlot = await fetchGroundedPlot(apiKey, {
+    title: performanceTitle, genre, venue, period, synopsis,
+  });
+
   const system =
     '너는 한국 초·중·고 교사의 융합예술수업 설계를 돕는 교육 컨설턴트다. ' +
     '교사가 공연 관람을 의미 있는 수업으로 연결하도록, 아래 순서로 실질적인 종합 답변을 한국어로 작성한다.\n' +
     '① 작품 줄거리(plotSummary): 학생·교사가 작품을 이해하도록 줄거리와 핵심 내용을 4~6문장으로 친절하게 설명한다. ' +
-    '제공된 "줄거리"가 있으면 그것을 우선 근거로 삼는다. "줄거리"가 비어 있거나 빈약하면, ' +
-    '제목으로 식별되는 잘 알려진 작품(원작 동화·소설·고전·유명 뮤지컬/연극 등)일 경우 너의 일반 지식을 활용해 ' +
-    '대표적인 이야기 전개·주요 인물·핵심 메시지를 재구성해 제공한다. ' +
+    '제공된 "확인된줄거리"(웹 검색으로 검증된 내용)가 있으면 그것을 최우선 근거로 그대로 활용한다. ' +
+    '없으면 "줄거리"(KOPIS)를 사용하고, 둘 다 비어 있거나 빈약하면 제목으로 식별되는 잘 알려진 작품(원작 동화·소설·' +
+    '고전·유명 뮤지컬/연극 등)일 경우 너의 일반 지식을 활용해 대표적인 이야기 전개·주요 인물·핵심 메시지를 재구성한다. ' +
     '확신이 어렵거나 동명의 여러 작품이 있을 수 있으면 단정하지 말고 "제목·장르로 미루어 ~로 보입니다"처럼 신중하게 쓰고, ' +
     '이 경우 문장 끝에 "(실제 공연 내용과 다를 수 있으니 확인이 필요합니다)"를 덧붙인다. ' +
     '종교 포교·선정성·폭력성은 배제하고 학생 눈높이로 쓴다. plotSummary는 절대 비워 두지 않는다.\n' +
@@ -140,6 +172,7 @@ export async function lessonIdeas(body, apiKey) {
     기본정보: { 장르: genre, 관람연령: rating, 러닝타임: runtime, 공연기간: period, 아동관람가: child },
     공연장: venue,
     티켓금액: price,
+    확인된줄거리: groundedPlot,
     줄거리: synopsis,
     키워드: keywords,
     성취기준: standards,
@@ -184,7 +217,8 @@ export async function lessonIdeas(body, apiKey) {
   const arr = (a, n) => (a ?? []).map(String).map(s => s.trim()).filter(Boolean).slice(0, n);
   return {
     title: json?.title ? String(json.title) : undefined,
-    plotSummary: json?.plotSummary ? String(json.plotSummary) : undefined,
+    // 웹 검색으로 검증된 줄거리가 있으면 그것을 우선 사용
+    plotSummary: groundedPlot || (json?.plotSummary ? String(json.plotSummary) : undefined),
     workSummary: json?.workSummary ? String(json.workSummary) : undefined,
     learningValue: arr(json?.learningValue, 8),
     overview: String(json?.overview ?? ''),
@@ -211,32 +245,34 @@ export async function introducePerformance(body, apiKey) {
   const title = String(body?.title ?? '').slice(0, 120);
   const genre = String(body?.genre ?? '').slice(0, 20);
   const synopsis = String(body?.synopsis ?? '').slice(0, 900);
+  const venue = String(body?.venue ?? '').slice(0, 80);
+  const period = String(body?.period ?? '').slice(0, 60);
+  const cast = (Array.isArray(body?.cast) ? body.cast : []).slice(0, 8).map(c => String(c).slice(0, 40));
 
+  // ── 그라운딩(웹 검색) 기반: 동명이작 혼동·환각을 막기 위해 실제 공연을 특정해 검색 ──
   const system =
-    '너는 공연을 교육적으로 소개하는 해설가다. 학생과 교사가 이해하기 쉽게 작품을 소개한다. ' +
-    'summary에는 작품의 줄거리·핵심 내용을 포함해 3~5문장으로 쓴다. ' +
-    '제공된 "줄거리"가 있으면 그것을 우선 근거로 삼고, 비어 있거나 빈약하면 제목으로 식별되는 ' +
-    '잘 알려진 작품일 경우 일반 지식을 활용해 대표적 이야기를 재구성한다. ' +
-    '확신이 어려우면 단정하지 말고 신중한 표현("~로 보입니다")을 쓰고, 추측이 섞였다면 ' +
-    '"실제 공연 내용과 다를 수 있습니다"를 덧붙인다. 사실 정보(가격·출연진 등)는 지어내지 않는다. ' +
-    '종교 포교성·선정성·폭력성 내용은 배제하고 초·중·고 학생에게 적합하게 쓴다. 모두 한국어로.';
+    '너는 공연을 교육적으로 소개하는 해설가다. 반드시 Google 검색 도구로 아래 "이 공연"을 먼저 특정한 뒤 답한다.\n' +
+    '검색 전략: 작품명과 함께 공연장·공연기간·출연진을 조합해 검색하고(예: "작품명 공연장 2025"), ' +
+    '위키백과·나무위키·예매처(인터파크 티켓·NOL 티켓·예스24 등) 등 신뢰할 수 있는 출처에서 ' +
+    '"바로 그 공연/원작"의 정보를 확인한다. 제목만 같은 다른 작품(동명이작)과 절대 혼동하지 않는다.\n' +
+    'summary에는 검색으로 확인한 줄거리·핵심 내용을 3~5문장으로 정확히 쓴다. ' +
+    'KOPIS가 제공한 "줄거리"가 있으면 교차 검증에 활용한다. ' +
+    '검색으로도 작품을 특정하기 어렵거나 정보가 상충하면, 지어내지 말고 그 사실을 밝히고 ' +
+    '확인 가능한 범위(장르·공연장·기간 등)만 신중하게 소개한다.\n' +
+    '사실(가격·출연진 등)은 추측하지 않는다. 종교 포교성·선정성·폭력성은 배제하고 초·중·고 학생 눈높이로 쓴다. ' +
+    '출력은 모두 한국어로 하며, 다른 설명·마크다운·코드펜스 없이 아래 JSON 객체 "하나만" 출력한다:\n' +
+    '{"summary": "작품 소개 3~5문장", "themes": ["핵심 주제"], "watchPoints": ["관람 포인트"], ' +
+    '"educationalValue": "교육적 의의", "discussionStarters": ["관람 후 이야깃거리"], ' +
+    '"verified": true/false (검색으로 작품을 특정·확인했으면 true), "sourceNote": "참고한 출처/근거 간단히"}';
 
-  const user = JSON.stringify({ 제목: title, 장르: genre, 줄거리: synopsis });
+  const user = JSON.stringify({
+    이공연: { 제목: title, 장르: genre, 공연장: venue, 공연기간: period, 출연진: cast },
+    KOPIS_줄거리: synopsis,
+  });
 
-  const schema = {
-    type: T.OBJECT,
-    properties: {
-      summary: { type: T.STRING },                                  // 작품 소개 3~5문장
-      themes: { type: T.ARRAY, items: { type: T.STRING } },         // 핵심 주제
-      watchPoints: { type: T.ARRAY, items: { type: T.STRING } },    // 관람 포인트
-      educationalValue: { type: T.STRING },                         // 교육적 의의
-      discussionStarters: { type: T.ARRAY, items: { type: T.STRING } }, // 관람 후 이야깃거리
-    },
-    required: ['summary', 'themes', 'watchPoints'],
-  };
-
+  // 그라운딩 시 responseSchema 사용 불가 → 프롬프트로 JSON 유도 + 폴백 파서로 추출
   const { json, model } = await callGeminiJSON({
-    apiKey, system, user, schema, temperature: 0.5, maxOutputTokens: 1200,
+    apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.3, maxOutputTokens: 1600,
   });
 
   const arr = (a, n) => (a ?? []).map(String).map(s => s.trim()).filter(Boolean).slice(0, n);
@@ -246,6 +282,8 @@ export async function introducePerformance(body, apiKey) {
     watchPoints: arr(json?.watchPoints, 6),
     educationalValue: json?.educationalValue ? String(json.educationalValue) : undefined,
     discussionStarters: arr(json?.discussionStarters, 6),
+    verified: typeof json?.verified === 'boolean' ? json.verified : undefined,
+    sourceNote: json?.sourceNote ? String(json.sourceNote).slice(0, 200) : undefined,
     _model: model,
   };
 }
