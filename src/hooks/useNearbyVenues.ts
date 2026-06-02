@@ -40,8 +40,8 @@ export function useNearbyVenues(
 
         if (cancelled) return;
 
-        // 2. 각 공연장까지 경로 정보 병렬 조회 (최대 20개)
-        const top = rawVenues.slice(0, 20);
+        // 2. 각 공연장까지 경로 정보 병렬 조회 (카카오 키워드 검색 상한인 최대 45개)
+        const top = rawVenues.slice(0, 45);
         const routeResults = await Promise.allSettled(
           top.map(v => getRouteInfo(school!.lat, school!.lng, v.lat, v.lng))
         );

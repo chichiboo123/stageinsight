@@ -158,7 +158,7 @@ export async function geocodeKeyword(query: string): Promise<{ lat: number; lng:
   }
 }
 
-// ---------- 반경 내 학교 검색 (SC4) ----------
+// ---------- 반경 내 학교 검색 (SC4, is_end까지 페이지네이션) ----------
 export async function searchNearbySchools(
   lat: number,
   lng: number,
@@ -174,18 +174,18 @@ export async function searchNearbySchools(
     size: '15',
   };
 
-  const p1 = new URLSearchParams({ ...baseParams, page: '1' });
-  const p2 = new URLSearchParams({ ...baseParams, page: '2' });
-
-  const [r1, r2] = await Promise.allSettled([
-    fetch(`${BASE_URL}/search/keyword.json?${p1}`, { headers: authHeader() }),
-    fetch(`${BASE_URL}/search/keyword.json?${p2}`, { headers: authHeader() }),
-  ]);
+  // 카카오 키워드 검색은 최대 3페이지(45건)까지 제공한다. is_end까지 모두 수집.
+  const requests = [1, 2, 3].map(page =>
+    fetch(`${BASE_URL}/search/keyword.json?${new URLSearchParams({ ...baseParams, page: String(page) })}`, {
+      headers: authHeader(),
+    }),
+  );
+  const results = await Promise.allSettled(requests);
 
   const docs: KakaoDocument[] = [];
   const seen = new Set<string>();
 
-  for (const r of [r1, r2]) {
+  for (const r of results) {
     if (r.status !== 'fulfilled' || !r.value.ok) continue;
     const data: KakaoSearchResponse = await r.value.json();
     for (const doc of data.documents) {
@@ -196,7 +196,7 @@ export async function searchNearbySchools(
     }
   }
 
-  return docs.slice(0, 20).map(doc => ({
+  return docs.map(doc => ({
     id: doc.id,
     name: doc.place_name,
     address: doc.road_address_name || doc.address_name,

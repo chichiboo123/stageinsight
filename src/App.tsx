@@ -31,9 +31,9 @@ function AppInner() {
 
   // ── 페이지 상태 (localStorage 초기화 + 유효성 검사) ──
   const [page, setPageState] = useState<Page>(() => {
-    // URL share/단축링크 파라미터가 있으면 insight 페이지로 시작
+    // URL 공유 파라미터(단축 ?s / gzip ?z / 레거시 ?share)가 있으면 인사이트 페이지로 시작
     const sp = new URLSearchParams(window.location.search);
-    if (sp.has('share') || sp.has('s')) return 'insight';
+    if (sp.has('share') || sp.has('s') || sp.has('z')) return 'insight';
     const saved = localStorage.getItem(PAGE_KEY) as Page | null;
     // 학교나 공연장이 없으면 map/dashboard로 복원하지 않음
     if (saved === 'map' && !state.selectedSchool) return 'home';

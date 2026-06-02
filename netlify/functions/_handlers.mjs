@@ -190,7 +190,6 @@ export async function lessonIdeas(body, apiKey) {
       workSummary: { type: T.STRING },           // ② 작품 기본 정보(사실) 요약
       learningValue: { type: T.ARRAY, items: { type: T.STRING } }, // ③ 이 작품으로 가능한 학습(종합)
       overview: { type: T.STRING },              // 수업 개요(2~3문장)
-      gradeBand: { type: T.STRING },             // 권장 학년군
       convergenceFocus: { type: T.STRING },      // 공연·영화·도서를 잇는 융합 포인트
       objectives: { type: T.ARRAY, items: { type: T.STRING } },
       activities: {
@@ -224,7 +223,6 @@ export async function lessonIdeas(body, apiKey) {
     workSummary: json?.workSummary ? String(json.workSummary) : undefined,
     learningValue: arr(json?.learningValue, 8),
     overview: String(json?.overview ?? ''),
-    gradeBand: String(json?.gradeBand ?? ''),
     convergenceFocus: json?.convergenceFocus ? String(json.convergenceFocus) : undefined,
     objectives: (json?.objectives ?? []).map(String).slice(0, 6),
     activities: (json?.activities ?? []).slice(0, 6).map(a => ({
