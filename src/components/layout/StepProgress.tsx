@@ -28,11 +28,11 @@ export function StepProgress({
   const step1Status: Status = hasSchool ? 'done' : 'current';
 
   const steps: Array<{
-    n: number; label: string; hint: string; status: Status; onClick: () => void; clickable: boolean;
+    n: number; label: string; short: string; hint: string; status: Status; onClick: () => void; clickable: boolean;
   }> = [
-    { n: 1, label: '학교 검색', hint: '학교를 찾으세요', status: step1Status, onClick: onStep1, clickable: true },
-    { n: 2, label: '공연장 선택', hint: '주변 공연장', status: step2Status, onClick: onStep2, clickable: hasSchool },
-    { n: 3, label: '공연 · 교육과정', hint: '연계 자료 보기', status: step3Status, onClick: onStep3, clickable: hasVenue },
+    { n: 1, label: '학교 검색', short: '학교', hint: '학교를 찾으세요', status: step1Status, onClick: onStep1, clickable: true },
+    { n: 2, label: '공연장 선택', short: '공연장', hint: '주변 공연장', status: step2Status, onClick: onStep2, clickable: hasSchool },
+    { n: 3, label: '공연·교육과정', short: '교육과정', hint: '연계 자료 보기', status: step3Status, onClick: onStep3, clickable: hasVenue },
   ];
 
   return (
@@ -52,12 +52,14 @@ export function StepProgress({
               onClick={s.onClick}
               disabled={!s.clickable}
               aria-current={s.status === 'current' ? 'step' : undefined}
+              aria-label={`${s.n}단계 ${s.label}`}
             >
               <span className={styles.badge}>
                 {s.status === 'done' ? '✓' : s.n}
               </span>
               <span className={styles.labels}>
                 <span className={styles.label}>{s.label}</span>
+                <span className={styles.labelShort}>{s.short}</span>
                 <span className={styles.hint}>{s.hint}</span>
               </span>
             </button>

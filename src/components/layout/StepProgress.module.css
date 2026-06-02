@@ -7,21 +7,24 @@
 
 .list {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   list-style: none;
   gap: 0;
+  width: 100%;
+  overflow: hidden;          /* 어떤 경우에도 가로 넘침 방지 */
 }
 
 .item {
   display: flex;
   align-items: center;
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 0;              /* flex 자식 넘침 방지의 핵심 */
 }
 
 /* 단계 사이 연결선 */
 .connector {
-  flex: 1;
+  flex: 1 1 8px;
+  min-width: 8px;
   height: 2px;
   background: var(--color-border);
   border-radius: var(--radius-full);
@@ -40,6 +43,7 @@
   background: transparent;
   cursor: pointer;
   min-height: 44px;
+  min-width: 0;
   transition: background var(--transition-fast);
   text-align: left;
 }
@@ -71,17 +75,24 @@
   flex-direction: column;
   line-height: 1.2;
   min-width: 0;
+  overflow: hidden;
 }
-.label {
+.label,
+.labelShort {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.labelShort { display: none; }   /* 모바일에서만 노출 */
 .hint {
   font-size: 11px;
   color: var(--color-text-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── 상태별 스타일 ── */
@@ -90,7 +101,8 @@
   border-color: var(--color-accent-primary);
   color: var(--color-text-on-accent);
 }
-.done .label { color: var(--color-text-primary); }
+.done .label,
+.done .labelShort { color: var(--color-text-primary); }
 
 .current .badge {
   background: var(--color-accent-primary);
@@ -98,7 +110,8 @@
   color: var(--color-text-on-accent);
   box-shadow: 0 0 0 4px var(--color-accent-light);
 }
-.current .label { color: var(--color-text-primary); }
+.current .label,
+.current .labelShort { color: var(--color-text-primary); }
 
 .todo .badge {
   background: var(--color-bg-card);
@@ -106,15 +119,24 @@
   color: var(--color-text-muted);
 }
 
-/* 모바일: 힌트 숨기고 압축 */
+/* 태블릿 이하: 힌트 숨김 */
+@media (max-width: 860px) {
+  .hint { display: none; }
+}
+
+/* 모바일: 짧은 라벨로 전환 + 여백 압축 (가로 넘침 방지) */
 @media (max-width: 640px) {
   .wrap { padding: var(--space-2) var(--space-3) 0; }
-  .hint { display: none; }
-  .step { padding: var(--space-2); gap: var(--space-1); }
-  .label { font-size: var(--font-size-xs); }
+  .label { display: none; }
+  .labelShort { display: block; }
+  .step { padding: var(--space-2) var(--space-1); gap: var(--space-1); }
+  .badge { width: 26px; height: 26px; font-size: 12px; }
+  .labelShort { font-size: var(--font-size-xs); }
   .connector { margin: 0 var(--space-1); }
 }
 
-@media (max-width: 400px) {
-  .label { display: none; }
+/* 초소형 화면: 번호 뱃지만 표시 */
+@media (max-width: 380px) {
+  .labels { display: none; }
+  .step { padding: var(--space-2); }
 }

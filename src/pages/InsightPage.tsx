@@ -15,6 +15,20 @@ const TYPE_LABELS: Record<string, string> = {
   book: '📚 도서',
 };
 
+const TYPE_ICONS: Record<string, string> = {
+  performance: '🎭',
+  standard: '📋',
+  movie: '🎬',
+  book: '📚',
+};
+
+const TYPE_TEXT: Record<string, string> = {
+  performance: '공연',
+  standard: '성취기준',
+  movie: '영화',
+  book: '도서',
+};
+
 // ---------- 그룹핑 유틸 ----------
 interface PerformanceGroup {
   performanceId: string | null;
@@ -785,26 +799,22 @@ export function InsightPage({ onBack }: InsightPageProps) {
                           <span className={styles.dragHandle} title="드래그하여 순서 변경" onClick={e => e.stopPropagation()}>
                             ⠿
                           </span>
-                          {item.thumbnail && (
-                            <img src={item.thumbnail} alt={item.title} className={styles.itemThumbnail} />
+                          {item.thumbnail ? (
+                            <img src={item.thumbnail} alt="" className={styles.itemThumbnail} />
+                          ) : (
+                            <span className={styles.itemIcon} aria-hidden="true">{TYPE_ICONS[item.type] ?? '•'}</span>
                           )}
                           <div className={styles.itemBody}>
-                            <span className="tag">{TYPE_LABELS[item.type] ?? item.type}</span>
+                            <span className={styles.itemType}>{TYPE_TEXT[item.type] ?? item.type}</span>
                             <strong className={styles.itemTitle}>{item.title}</strong>
                             {item.subtitle && (
                               <small className={styles.itemSubtitle}>{item.subtitle}</small>
                             )}
-                            {item.detail && (
-                              <p className={styles.itemDetail}>{item.detail}</p>
-                            )}
-                            <small className={styles.itemDate}>
-                              {new Date(item.savedAt).toLocaleDateString('ko-KR')}
-                            </small>
                           </div>
                           <button
                             className={styles.removeBtn}
                             onClick={e => { e.stopPropagation(); removeInsightItem(item.id); }}
-                            aria-label="삭제"
+                            aria-label={`${item.title} 삭제`}
                           >
                             ×
                           </button>
