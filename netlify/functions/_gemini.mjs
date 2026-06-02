@@ -18,14 +18,16 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
  * 모델 우선순위 체인 (앞에서부터 시도)
- *  1순위: gemini-2.5-flash        — 품질 우선
- *  2순위: gemini-3.1-flash-lite   — 1순위 한도 초과 시
- *  3순위: gemini-2.5-flash-lite   — 최종 폴백
- * 모두 무료 티어에서 호출 가능한 모델이다.
+ *  1순위: gemini-2.5-flash       — 품질 우선(무료 티어)
+ *  2순위: gemini-2.5-flash-lite  — 1순위 한도 초과 시 폴백(무료 티어)
+ * 두 모델 모두 thinkingBudget=0으로 '사고(thinking)' 토큰을 꺼서
+ * 전체 출력 토큰(maxOutputTokens)을 본문에 사용하도록 한다(아래 callOnce 참고).
+ *
+ * ⚠ 과거 체인의 'gemini-3.1-flash-lite'는 텍스트 생성 모델이 아니라
+ *   이미지 생성 계열 명칭이어서 404를 유발했다 → 제거.
  */
 export const MODEL_CHAIN = [
   'gemini-2.5-flash',
-  'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
 ];
 
@@ -43,25 +45,50 @@ export class GeminiError extends Error {
 /**
  * 해당 HTTP 상태코드가 "다음 모델로 폴백할 가치가 있는" 오류인지 판단한다.
  *  - 429: 요청 한도/할당량 초과 (Rate Limit) → 다른 모델로 전환
- *  - 500/503: 서버 과부하/일시 오류 → 다른 모델로 전환
+ *  - 500/502/503: 서버 과부하·게이트웨이·일시 오류 → 다른 모델로 전환
+ *    (502는 연결 실패·빈 응답·JSON 파싱 실패 등 우리 내부 오류 표기에도 쓰이며,
+ *     다른 모델은 정상 JSON을 줄 수 있으므로 반드시 폴백 대상에 포함한다.)
  *  - 403/404: 해당 모델 사용 불가/미존재 → 다른 모델로 전환
  *  - 400/401: 요청 형식 오류·인증 실패 → 모델을 바꿔도 동일하게 실패하므로 즉시 중단
  */
 function isFallbackWorthy(status) {
-  return status === 429 || status === 500 || status === 503 || status === 403 || status === 404;
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 403 || status === 404;
+}
+
+/**
+ * 모델 세대에 맞는 thinkingConfig를 만든다.
+ * ────────────────────────────────────────────────────────────
+ * ★ 502의 핵심 원인 차단:
+ *   Gemini 2.5/3 Flash 계열은 '사고(thinking)'가 기본 활성화되어 있고,
+ *   사고 토큰이 maxOutputTokens 예산을 함께 소모한다. responseSchema(JSON 구조화)
+ *   응답에서 사고가 예산을 잠식하면 본문이 잘리거나(빈 응답/MAX_TOKENS) 비어,
+ *   "JSON으로 파싱하지 못했습니다" 오류로 모든 모델이 실패해 502가 난다.
+ *   → 구조화 출력에는 사고가 필수가 아니므로 기본적으로 끈다(전체 예산을 본문에 사용).
+ *
+ *  - Gemini 2.x : thinkingBudget(정수). 0이면 사고 비활성.
+ *  - Gemini 3.x+: thinkingLevel(문자열). thinkingBudget과 동시 전송 시 400이므로 분기.
+ */
+function thinkingConfigFor(model, budget = 0) {
+  const isGen3Plus = /gemini-(?:[3-9]|\d{2,})/.test(model);
+  if (isGen3Plus) {
+    return { thinkingLevel: budget > 0 ? 'low' : 'minimal' };
+  }
+  return { thinkingBudget: Math.max(0, Number(budget) || 0) };
 }
 
 /**
  * 단일 모델로 generateContent를 1회 호출한다 (내부 함수).
  * 성공 시 파싱된 JSON 객체를 반환하고, 실패 시 GeminiError를 throw 한다.
  */
-async function callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens }) {
+async function callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget = 0 }) {
   const body = {
     contents: [{ role: 'user', parts: [{ text: user }] }],
     generationConfig: {
       responseMimeType: 'application/json',
       temperature,
       maxOutputTokens,
+      // ★ 사고 토큰이 출력 예산을 잠식해 JSON이 잘리는 문제(502) 예방
+      thinkingConfig: thinkingConfigFor(model, thinkingBudget),
       ...(schema ? { responseSchema: schema } : {}),
     },
   };
@@ -85,9 +112,14 @@ async function callOnce({ apiKey, model, system, user, schema, temperature, maxO
   }
 
   const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') ?? '';
+  const candidate = data?.candidates?.[0];
+  const text = candidate?.content?.parts?.map(p => p.text).join('') ?? '';
+  const finishReason = candidate?.finishReason;
   if (!text.trim()) {
-    throw new GeminiError('Gemini가 빈 응답을 반환했습니다.', 502);
+    const why = finishReason === 'MAX_TOKENS'
+      ? '출력 토큰 한도(MAX_TOKENS)에 도달해 본문이 비었습니다.'
+      : `빈 응답(finishReason=${finishReason ?? '알수없음'}).`;
+    throw new GeminiError(`Gemini가 빈 응답을 반환했습니다. ${why}`, 502);
   }
 
   try {
@@ -100,7 +132,8 @@ async function callOnce({ apiKey, model, system, user, schema, temperature, maxO
         return JSON.parse(match[0]);
       } catch { /* fallthrough */ }
     }
-    throw new GeminiError('Gemini 응답을 JSON으로 파싱하지 못했습니다.', 502);
+    const hint = finishReason === 'MAX_TOKENS' ? ' (출력이 MAX_TOKENS로 잘렸습니다 — maxOutputTokens를 늘리세요)' : '';
+    throw new GeminiError(`Gemini 응답을 JSON으로 파싱하지 못했습니다.${hint}`, 502);
   }
 }
 
@@ -125,6 +158,7 @@ export async function callGeminiJSON({
   schema,
   temperature = 0.3,
   maxOutputTokens = 1024,
+  thinkingBudget = 0,
 }) {
   if (!apiKey) {
     throw new GeminiError('GEMINI_API_KEY가 설정되지 않았습니다.', 503);
@@ -135,7 +169,7 @@ export async function callGeminiJSON({
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     try {
-      const json = await callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens });
+      const json = await callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget });
       // 폴백이 발생했다면(첫 모델이 아니면) 로그로 남겨 추적 가능하게 한다.
       if (i > 0) {
         console.info(`[Gemini] 폴백 성공: '${model}' 사용 (우선순위 ${i + 1}위)`);

@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { aiLessonIdeas } from '../services/ai';
-import type { InsightBoard, InsightItem, InsightMemo, LessonPlan } from '../types';
+import type { InsightBoard, InsightItem, InsightMemo, InsightPerformanceMeta, LessonPlan } from '../types';
 import styles from './InsightPage.module.css';
 
 interface InsightPageProps {
@@ -256,13 +256,39 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
 }
 
 // ---------- 메인 컴포넌트 ----------
+// ---------- 작품 기본 정보 → 라벨/값 목록 ----------
+function metaToRows(meta: InsightPerformanceMeta | null | undefined): Array<{ label: string; value: string }> {
+  if (!meta) return [];
+  const rows: Array<{ label: string; value: string }> = [];
+  if (meta.genre) rows.push({ label: '장르', value: meta.genre });
+  if (meta.rating) rows.push({ label: '관람연령', value: meta.rating });
+  if (meta.runtime) rows.push({ label: '러닝타임', value: meta.runtime });
+  if (meta.period && meta.period.trim() !== '~') rows.push({ label: '공연기간', value: meta.period });
+  if (meta.venue) rows.push({ label: '공연장', value: meta.venue });
+  if (meta.price) rows.push({ label: '티켓 금액', value: meta.price });
+  return rows;
+}
+
 // ---------- AI 수업 아이디어: 텍스트 변환 (메모 저장/복사용) ----------
-function lessonPlanToText(plan: LessonPlan, performanceTitle: string): string {
+function lessonPlanToText(plan: LessonPlan, performanceTitle: string, meta?: InsightPerformanceMeta | null): string {
   const lines: string[] = [];
   lines.push(`✨ AI 융합예술 수업 — ${plan.title || performanceTitle}`);
   if (plan.gradeBand) lines.push(`권장 학년군: ${plan.gradeBand}`);
   lines.push('');
-  if (plan.overview) { lines.push(`[개요] ${plan.overview}`); lines.push(''); }
+  // 작품 기본 정보
+  const rows = metaToRows(meta);
+  if (rows.length > 0 || plan.workSummary) {
+    lines.push('[작품 기본 정보]');
+    rows.forEach(r => lines.push(`· ${r.label}: ${r.value}`));
+    if (plan.workSummary) lines.push(plan.workSummary);
+    lines.push('');
+  }
+  if (plan.learningValue?.length) {
+    lines.push('[이 작품으로 배울 수 있는 것]');
+    plan.learningValue.forEach(v => lines.push(`· ${v}`));
+    lines.push('');
+  }
+  if (plan.overview) { lines.push(`[수업 개요] ${plan.overview}`); lines.push(''); }
   if (plan.convergenceFocus) { lines.push(`[융합 포인트] ${plan.convergenceFocus}`); lines.push(''); }
   if (plan.objectives?.length) {
     lines.push('[학습 목표]');
@@ -288,15 +314,17 @@ function lessonPlanToText(plan: LessonPlan, performanceTitle: string): string {
 
 // ---------- AI 수업 아이디어 모달 ----------
 function LessonPlanModal({
-  performanceTitle, plan, loading, error, onClose, onSaveMemo,
+  performanceTitle, plan, meta, loading, error, onClose, onSaveMemo,
 }: {
   performanceTitle: string;
   plan: LessonPlan | null;
+  meta: InsightPerformanceMeta | null;
   loading: boolean;
   error: string | null;
   onClose: () => void;
   onSaveMemo: () => void;
 }) {
+  const infoRows = metaToRows(meta);
   return (
     <div
       style={{
@@ -328,8 +356,36 @@ function LessonPlanModal({
 
         {plan && !loading && (
           <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
+            {/* ① 작품 기본 정보 (사실 정보 + AI 요약) */}
+            {(infoRows.length > 0 || plan.workSummary) && (
+              <div style={{ background: 'rgba(107,138,253,0.06)', borderRadius: 10, padding: '12px 14px', margin: '4px 0 12px' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>🎭 작품 기본 정보</h4>
+                {infoRows.length > 0 && (
+                  <ul style={{ margin: '0 0 6px', paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 3 }}>
+                    {infoRows.map(r => (
+                      <li key={r.label} style={{ fontSize: 13 }}>
+                        <span style={{ color: 'var(--color-text-muted)', display: 'inline-block', minWidth: 64 }}>{r.label}</span>
+                        <span>{r.value}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {plan.workSummary && <p style={{ margin: '6px 0 0', fontSize: 13.5 }}>{plan.workSummary}</p>}
+              </div>
+            )}
+
+            {/* ② 이 작품으로 배울 수 있는 것 */}
+            {plan.learningValue && plan.learningValue.length > 0 && (
+              <>
+                <h4 style={{ margin: '12px 0 6px' }}>🎓 이 작품으로 배울 수 있는 것</h4>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {plan.learningValue.map((v, i) => <li key={i}>{v}</li>)}
+                </ul>
+              </>
+            )}
+
             {plan.gradeBand && (
-              <span className="tag" style={{ marginBottom: 8, display: 'inline-block' }}>권장 학년군: {plan.gradeBand}</span>
+              <span className="tag" style={{ margin: '14px 0 8px', display: 'inline-block' }}>권장 학년군: {plan.gradeBand}</span>
             )}
             {plan.overview && <p style={{ marginTop: 4 }}>{plan.overview}</p>}
 
@@ -411,15 +467,20 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const [lessonTitle, setLessonTitle] = useState('');
   const [lessonPerfId, setLessonPerfId] = useState<string | null>(null);
   const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
+  const [lessonMeta, setLessonMeta] = useState<InsightPerformanceMeta | null>(null);
   const [lessonLoading, setLessonLoading] = useState(false);
   const [lessonError, setLessonError] = useState<string | null>(null);
 
   const handleGenerateLesson = useCallback(async (group: PerformanceGroup) => {
     const title = group.performanceTitle ?? '공연 미지정';
+    const perfItem = group.items.find(i => i.type === 'performance');
+    const meta = perfItem?.meta ?? null;
+
     setLessonOpen(true);
     setLessonTitle(title);
     setLessonPerfId(group.performanceId);
     setLessonPlan(null);
+    setLessonMeta(meta);
     setLessonError(null);
     setLessonLoading(true);
 
@@ -431,12 +492,20 @@ export function InsightPage({ onBack }: InsightPageProps) {
       });
     const movies = group.items.filter(i => i.type === 'movie').map(i => i.title);
     const books = group.items.filter(i => i.type === 'book').map(i => i.title);
-    const synopsis = group.items.find(i => i.type === 'performance')?.detail ?? '';
+    const synopsis = perfItem?.detail ?? '';
 
     try {
       const plan = await aiLessonIdeas({
         performanceTitle: title,
+        genre: meta?.genre,
         synopsis,
+        runtime: meta?.runtime,
+        rating: meta?.rating,
+        venue: meta?.venue,
+        price: meta?.price,
+        period: meta?.period,
+        child: meta?.child,
+        keywords: meta?.keywords,
         standards,
         movies,
         books,
@@ -457,12 +526,12 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const handleSaveLessonMemo = useCallback(() => {
     if (!lessonPlan) return;
     addInsightMemo(
-      lessonPlanToText(lessonPlan, lessonTitle),
+      lessonPlanToText(lessonPlan, lessonTitle, lessonMeta),
       lessonPerfId ?? undefined,
       lessonPerfId ? lessonTitle : undefined,
     );
     setLessonOpen(false);
-  }, [lessonPlan, lessonTitle, lessonPerfId, addInsightMemo]);
+  }, [lessonPlan, lessonTitle, lessonMeta, lessonPerfId, addInsightMemo]);
 
   // ── 드래그 앤 드롭 ──
   const dragId = useRef<string | null>(null);
@@ -823,6 +892,7 @@ export function InsightPage({ onBack }: InsightPageProps) {
         <LessonPlanModal
           performanceTitle={lessonTitle}
           plan={lessonPlan}
+          meta={lessonMeta}
           loading={lessonLoading}
           error={lessonError}
           onClose={() => setLessonOpen(false)}
