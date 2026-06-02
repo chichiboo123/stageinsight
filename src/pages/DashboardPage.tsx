@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { usePerformances, usePerformanceDetail } from '../hooks/usePerformances';
 import { useDashboardCuration } from '../hooks/useDashboardCuration';
@@ -8,7 +8,8 @@ import { ErrorMessage } from '../components/common/ErrorMessage';
 import { PosterModal } from '../components/common/PosterModal';
 import { aiIntroducePerformance } from '../services/ai';
 import { fetchWikiSummary, namuwikiUrl, wikipediaSearchUrl, type WikiSummary } from '../services/wiki';
-import type { CurriculumType, Movie, Book, PerformanceIntro } from '../types';
+import { searchStandards, getStandardFacets, type StandardFilter } from '../services/curriculumMatcher';
+import type { CurriculumType, Movie, Book, PerformanceIntro, InsightItem, AchievementStandard } from '../types';
 import styles from './DashboardPage.module.css';
 
 const CURRICULUM_FILTERS: { label: string; value: CurriculumType }[] = [
@@ -381,6 +382,247 @@ function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void })
   );
 }
 
+// ---------- AI 교육 해설 내보내기 (텍스트/이미지) ----------
+const EXPORT_FONT = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+
+/** AI 작품 소개(PerformanceIntro)를 평문 텍스트로 변환한다. */
+function introToText(intro: PerformanceIntro, title: string): string {
+  const lines: string[] = [`✨ AI 교육 해설 — ${title}`, ''];
+  if (intro.summary) { lines.push('[작품 소개]', intro.summary, ''); }
+  if (intro.themes?.length) { lines.push('[핵심 주제]', intro.themes.map(t => `#${t}`).join(' '), ''); }
+  if (intro.watchPoints?.length) { lines.push('[관람 포인트]', ...intro.watchPoints.map(w => `· ${w}`), ''); }
+  if (intro.educationalValue) { lines.push('[교육적 의의]', intro.educationalValue, ''); }
+  if (intro.discussionStarters?.length) { lines.push('[관람 후 이야깃거리]', ...intro.discussionStarters.map(q => `· ${q}`), ''); }
+  if (intro.sourceNote) lines.push(`🔎 참고: ${intro.sourceNote}`);
+  lines.push('', 'created by. 교육뮤지컬 꿈꾸는 치수쌤');
+  return lines.join('\n').trim();
+}
+
+/** maxWidth(px)에 맞춰 텍스트를 줄바꿈한다(한글 친화). */
+function wrapExportText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const out: string[] = [];
+  for (const para of String(text).split('\n')) {
+    if (!para) { out.push(''); continue; }
+    let line = '';
+    for (const ch of para) {
+      const test = line + ch;
+      if (line && ctx.measureText(test).width > maxWidth) { out.push(line); line = ch; }
+      else line = test;
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+/** AI 교육 해설을 고해상도 카드 이미지(canvas)로 렌더한다. */
+async function renderIntroCanvas(intro: PerformanceIntro, title: string): Promise<HTMLCanvasElement> {
+  const SCALE = 3, W = 820, PAD = 44, innerW = W - PAD * 2;
+  try { await (document as Document & { fonts?: FontFaceSet }).fonts?.ready; } catch { /* ignore */ }
+
+  const measure = document.createElement('canvas').getContext('2d')!;
+  type Op = { y: number; text: string; font: string; color: string; x: number };
+  const ops: Op[] = [];
+  const F_TITLE = `bold 26px ${EXPORT_FONT}`;
+  const F_H = `bold 16px ${EXPORT_FONT}`;
+  const F_BODY = `15px ${EXPORT_FONT}`;
+  const F_FOOT = `12px ${EXPORT_FONT}`;
+  let y = 54;
+
+  ops.push({ x: PAD, y, text: '✨ AI 교육 해설', font: F_TITLE, color: '#1f2937' });
+  y += 26;
+  measure.font = F_H;
+  for (const l of wrapExportText(measure, title, innerW)) { ops.push({ x: PAD, y, text: l, font: F_H, color: '#4F46E5' }); y += 22; }
+  y += 12;
+
+  const block = (heading: string, body: string[]) => {
+    if (body.length === 0 || body.every(b => !b.trim())) return;
+    ops.push({ x: PAD, y, text: heading, font: F_H, color: '#374151' }); y += 24;
+    for (const para of body) {
+      measure.font = F_BODY;
+      for (const l of wrapExportText(measure, para, innerW)) { ops.push({ x: PAD, y, text: l, font: F_BODY, color: '#1f2937' }); y += 22; }
+    }
+    y += 12;
+  };
+
+  if (intro.summary) block('📖 작품 소개', [intro.summary]);
+  if (intro.themes?.length) block('🎯 핵심 주제', [intro.themes.map(t => `#${t}`).join('  ')]);
+  if (intro.watchPoints?.length) block('👀 관람 포인트', intro.watchPoints.map(w => `· ${w}`));
+  if (intro.educationalValue) block('🎓 교육적 의의', [intro.educationalValue]);
+  if (intro.discussionStarters?.length) block('💬 관람 후 이야깃거리', intro.discussionStarters.map(q => `· ${q}`));
+
+  const footY = y + 16;
+  const H = footY + 24;
+  ops.push({ x: PAD, y: footY, text: 'created by. 교육뮤지컬 꿈꾸는 치수쌤', font: F_FOOT, color: '#9ca3af' });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SCALE; canvas.height = H * SCALE;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(SCALE, SCALE);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#4F46E5'; ctx.fillRect(0, 0, W, 6);
+  for (const op of ops) { ctx.font = op.font; ctx.fillStyle = op.color; ctx.fillText(op.text, op.x, op.y); }
+  return canvas;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob | null> {
+  return new Promise(resolve => canvas.toBlob(resolve, type, quality));
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- 성취기준 직접 찾기 패널 (ssdguide 스타일 4단계 필터 + 키워드 검색) ----------
+function StandardFinder({
+  isSaved, onAdd, onRemove,
+}: {
+  isSaved: (type: string, id: string) => boolean;
+  onAdd: (s: AchievementStandard) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState<StandardFilter>({});
+  const [facets, setFacets] = useState<{ curriculumTypes: string[]; grades: string[]; subjects: string[]; domains: string[] }>({
+    curriculumTypes: [], grades: [], subjects: [], domains: [],
+  });
+  const [results, setResults] = useState<AchievementStandard[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // 상위 필터가 바뀌면 하위 선택을 초기화한다(연쇄 필터).
+  const setField = useCallback((key: keyof StandardFilter, value: string) => {
+    setFilter(prev => {
+      const next: StandardFilter = { ...prev, [key]: value };
+      if (key === 'curriculumType') { next.grade = ''; next.subject = ''; next.domain = ''; }
+      else if (key === 'grade') { next.subject = ''; next.domain = ''; }
+      else if (key === 'subject') { next.domain = ''; }
+      return next;
+    });
+  }, []);
+
+  // 선택 가능한 하위 옵션 갱신 (키워드 제외 4단계 필터에만 반응)
+  useEffect(() => {
+    if (!open) return;
+    getStandardFacets(filter).then(setFacets).catch(() => { /* ignore */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, filter.curriculumType, filter.grade, filter.subject, filter.domain]);
+
+  // 결과 검색 (필터·키워드 변경 시)
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(() => {
+      searchStandards(filter, 80)
+        .then(r => { if (!cancelled) { setResults(r); setLoading(false); } })
+        .catch(() => { if (!cancelled) { setResults([]); setLoading(false); } });
+    }, 180);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [open, filter]);
+
+  const sortedGrades = useMemo(() => {
+    return [...facets.grades].sort((a, b) => {
+      const ai = GRADE_ORDER.indexOf(a); const bi = GRADE_ORDER.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+  }, [facets.grades]);
+
+  const hasFilter = !!(filter.curriculumType || filter.grade || filter.subject || filter.domain || (filter.keyword ?? '').trim());
+
+  const selStyle: React.CSSProperties = {
+    fontSize: 13, padding: '6px 10px', borderRadius: 8,
+    border: '1px solid var(--color-border)', background: 'var(--color-bg-primary)',
+    color: 'var(--color-text-primary)', maxWidth: 200,
+  };
+
+  return (
+    <div style={{ marginTop: 12, border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 8, padding: '10px 14px', background: 'var(--color-bg-secondary)',
+          border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          color: 'var(--color-text-primary)',
+        }}
+        aria-expanded={open}
+      >
+        <span>🔎 성취기준 직접 찾기 <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>— 추천에 없는 성취기준도 직접 검색해 담기</span></span>
+        <span aria-hidden="true">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: 14 }}>
+          {/* 4단계 필터 + 키워드 */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            <select style={selStyle} value={filter.curriculumType ?? ''} onChange={e => setField('curriculumType', e.target.value)}>
+              <option value="">교육과정 전체</option>
+              {facets.curriculumTypes.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select style={selStyle} value={filter.grade ?? ''} onChange={e => setField('grade', e.target.value)}>
+              <option value="">학년군 전체</option>
+              {sortedGrades.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+            <select style={selStyle} value={filter.subject ?? ''} onChange={e => setField('subject', e.target.value)}>
+              <option value="">교과 전체</option>
+              {facets.subjects.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select style={selStyle} value={filter.domain ?? ''} onChange={e => setField('domain', e.target.value)}>
+              <option value="">영역 전체</option>
+              {facets.domains.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <input
+              type="search"
+              value={filter.keyword ?? ''}
+              onChange={e => setFilter(prev => ({ ...prev, keyword: e.target.value }))}
+              placeholder="코드·내용·교과 키워드 검색"
+              style={{ ...selStyle, maxWidth: 220, flex: '1 1 180px' }}
+            />
+            {hasFilter && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setFilter({})}>초기화</button>
+            )}
+          </div>
+
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 8px' }}>
+            {loading ? '검색 중…' : `${results.length}개${results.length >= 80 ? '+ (상위 80개)' : ''} 표시${!hasFilter ? ' · 필터나 키워드로 좁혀보세요' : ''}`}
+          </p>
+
+          <div className={styles.standardGrid}>
+            {results.map(standard => (
+              <div key={standard.id} className={`card ${styles.standardCard}`}>
+                <div className={styles.standardMeta}>
+                  <div className={styles.standardTags}>
+                    <span className="tag">{standard.curriculumType}</span>
+                    <span className="tag">{standard.subject}</span>
+                    {standard.grade && <span className="tag">{standard.grade}</span>}
+                    {standard.domain && <span className="tag">{standard.domain}</span>}
+                  </div>
+                </div>
+                <code className={styles.standardId}>{standard.id}</code>
+                <p className={styles.standardContent}>{standard.content}</p>
+                <button
+                  className={`${styles.bookmarkBtnSm} ${isSaved('standard', standard.id) ? styles.bookmarkSaved : ''}`}
+                  title={isSaved('standard', standard.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                  aria-label={isSaved('standard', standard.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
+                  aria-pressed={isSaved('standard', standard.id)}
+                  onClick={() => isSaved('standard', standard.id) ? onRemove(standard.id) : onAdd(standard)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {isSaved('standard', standard.id) ? 'bookmark_added' : 'bookmark_add'}
+                  </span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ================================================================
 export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const { state, selectVenue, selectPerformance, addInsightItem, removeInsightItem } = useApp();
@@ -404,6 +646,8 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const [intro, setIntro] = useState<PerformanceIntro | null>(null);
   const [introLoading, setIntroLoading] = useState(false);
   const [introError, setIntroError] = useState<string | null>(null);
+  const [introMsg, setIntroMsg] = useState('');
+  const introMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 작품 정보(위키백과) 팝업 — AI 미사용
   const [wikiOpen, setWikiOpen] = useState(false);
@@ -423,6 +667,41 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   );
   const displayPerformance = detailedPerformance ?? selectedPerformance;
 
+  // 현재 공연을 인사이트 항목으로 변환 (담기/자동 담기에 공용 사용)
+  const buildPerformanceItem = useCallback((): InsightItem | null => {
+    if (!displayPerformance) return null;
+    return {
+      type: 'performance',
+      id: displayPerformance.id,
+      title: displayPerformance.title,
+      subtitle: displayPerformance.venue,
+      thumbnail: displayPerformance.poster,
+      detail: displayPerformance.synopsis,
+      // AI 융합수업 설계 시 '작품 기본 정보'로 활용
+      meta: {
+        genre: displayPerformance.genre,
+        venue: displayPerformance.venue,
+        price: displayPerformance.price,
+        runtime: displayPerformance.runtime,
+        rating: displayPerformance.rating,
+        period: `${formatDate(displayPerformance.startDate)} ~ ${formatDate(displayPerformance.endDate)}`,
+        child: displayPerformance.child,
+        keywords: displayPerformance.keywords,
+      },
+      performanceId: displayPerformance.id,
+      performanceTitle: displayPerformance.title,
+      savedAt: new Date().toISOString(),
+    };
+  }, [displayPerformance]);
+
+  // 성취기준·영화·도서를 담을 때, 그 공연 작품도 자동으로 함께 담는다.
+  // (작품 담기 버튼을 놓치기 쉬운 UI 보완 — addInsightItem은 중복을 자동 제거)
+  const addWithPerformance = useCallback((child: InsightItem) => {
+    const perf = buildPerformanceItem();
+    if (perf) addInsightItem(perf);
+    addInsightItem(child);
+  }, [buildPerformanceItem, addInsightItem]);
+
   const {
     matches, currLoading, activeFilters, setFilters,
     movies, books, moviesLoading, booksLoading, moviesError, booksError,
@@ -436,7 +715,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
     setWikiData(null);
     setWikiLoading(true);
     try {
-      const data = await fetchWikiSummary(displayPerformance.title);
+      const data = await fetchWikiSummary(displayPerformance.title, displayPerformance.genre);
       setWikiData(data);
       if (!data) setWikiError('위키백과에서 이 작품의 문서를 찾지 못했습니다.');
     } catch {
@@ -458,6 +737,53 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
       setIntroLoading(false);
     }
   }, [displayPerformance]);
+
+  // ── AI 교육 해설 내보내기 (텍스트 복사 / TXT / JPG 다운로드 / JPG 복사) ──
+  const flashIntro = useCallback((msg: string) => {
+    if (introMsgTimer.current) clearTimeout(introMsgTimer.current);
+    setIntroMsg(msg);
+    introMsgTimer.current = setTimeout(() => setIntroMsg(''), 2200);
+  }, []);
+
+  const handleCopyIntroText = useCallback(async () => {
+    if (!intro || !displayPerformance) return;
+    try {
+      await navigator.clipboard.writeText(introToText(intro, displayPerformance.title));
+      flashIntro('✅ 텍스트 복사됨');
+    } catch { flashIntro('❌ 복사 실패'); }
+  }, [intro, displayPerformance, flashIntro]);
+
+  const handleDownloadIntroTxt = useCallback(() => {
+    if (!intro || !displayPerformance) return;
+    const blob = new Blob([introToText(intro, displayPerformance.title)], { type: 'text/plain;charset=utf-8' });
+    downloadBlob(blob, `AI교육해설_${displayPerformance.title}.txt`);
+    flashIntro('✅ TXT 저장됨');
+  }, [intro, displayPerformance, flashIntro]);
+
+  const handleDownloadIntroJpg = useCallback(async () => {
+    if (!intro || !displayPerformance) return;
+    try {
+      const canvas = await renderIntroCanvas(intro, displayPerformance.title);
+      const blob = await canvasToBlob(canvas, 'image/jpeg', 0.95);
+      if (blob) { downloadBlob(blob, `AI교육해설_${displayPerformance.title}.jpg`); flashIntro('✅ JPG 저장됨'); }
+    } catch { flashIntro('❌ 이미지 생성 실패'); }
+  }, [intro, displayPerformance, flashIntro]);
+
+  const handleCopyIntroJpg = useCallback(async () => {
+    if (!intro || !displayPerformance) return;
+    try {
+      const canvas = await renderIntroCanvas(intro, displayPerformance.title);
+      // 클립보드 이미지 쓰기는 브라우저 호환상 PNG만 안정적으로 지원된다.
+      const blob = await canvasToBlob(canvas, 'image/png');
+      if (!blob) throw new Error('no blob');
+      const ClipItem = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+      if (!ClipItem || !navigator.clipboard?.write) throw new Error('unsupported');
+      await navigator.clipboard.write([new ClipItem({ 'image/png': blob })]);
+      flashIntro('✅ 이미지 복사됨');
+    } catch {
+      flashIntro('⚠️ 이미지 복사 미지원 — JPG 저장을 이용하세요');
+    }
+  }, [intro, displayPerformance, flashIntro]);
 
   const availableGrades = useMemo(() => {
     const grades = [...new Set(matches.map(m => m.standard.grade))];
@@ -656,9 +982,16 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       )}
                       {intro && (
                         <div className="card" style={{ padding: 16, marginTop: 4, background: 'rgba(107,138,253,0.06)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <strong style={{ fontSize: 14 }}>✨ AI 작품 소개</strong>
-                            <button className="btn btn-ghost" style={{ fontSize: 12, padding: '2px 8px' }} onClick={() => setIntro(null)}>접기</button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {introMsg && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginRight: 2 }}>{introMsg}</span>}
+                              <button className={styles.introToolBtn} title="텍스트 클립보드 복사" aria-label="텍스트 복사" onClick={handleCopyIntroText}>📋</button>
+                              <button className={styles.introToolBtn} title="TXT 파일 다운로드" aria-label="TXT 다운로드" onClick={handleDownloadIntroTxt}>📄</button>
+                              <button className={styles.introToolBtn} title="JPG 이미지 다운로드" aria-label="JPG 다운로드" onClick={handleDownloadIntroJpg}>🖼️</button>
+                              <button className={styles.introToolBtn} title="이미지 클립보드 복사" aria-label="이미지 복사" onClick={handleCopyIntroJpg}>📸</button>
+                              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '2px 8px' }} onClick={() => setIntro(null)}>접기</button>
+                            </div>
                           </div>
                           <p style={{ fontSize: 14, lineHeight: 1.6, margin: '8px 0' }}>{intro.summary}</p>
                           {intro.themes.length > 0 && (
@@ -754,30 +1087,14 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                     title={isSaved('performance', displayPerformance!.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
                     aria-label={isSaved('performance', displayPerformance!.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                     aria-pressed={isSaved('performance', displayPerformance!.id)}
-                    onClick={() => isSaved('performance', displayPerformance!.id)
-                      ? removeInsightItem(displayPerformance!.id)
-                      : addInsightItem({
-                      type: 'performance',
-                      id: displayPerformance!.id,
-                      title: displayPerformance!.title,
-                      subtitle: displayPerformance!.venue,
-                      thumbnail: displayPerformance!.poster,
-                      detail: displayPerformance!.synopsis,
-                      // AI 융합수업 설계 시 '작품 기본 정보'로 활용
-                      meta: {
-                        genre: displayPerformance!.genre,
-                        venue: displayPerformance!.venue,
-                        price: displayPerformance!.price,
-                        runtime: displayPerformance!.runtime,
-                        rating: displayPerformance!.rating,
-                        period: `${formatDate(displayPerformance!.startDate)} ~ ${formatDate(displayPerformance!.endDate)}`,
-                        child: displayPerformance!.child,
-                        keywords: displayPerformance!.keywords,
-                      },
-                      performanceId: displayPerformance!.id,
-                      performanceTitle: displayPerformance!.title,
-                      savedAt: new Date().toISOString(),
-                    })}
+                    onClick={() => {
+                      if (isSaved('performance', displayPerformance!.id)) {
+                        removeInsightItem(displayPerformance!.id);
+                        return;
+                      }
+                      const perf = buildPerformanceItem();
+                      if (perf) addInsightItem(perf);
+                    }}
                   >
                     <span className="material-symbols-outlined" aria-hidden="true">
                       {isSaved('performance', displayPerformance!.id) ? 'bookmark_added' : 'bookmark_add'}
@@ -966,7 +1283,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         aria-pressed={isSaved('standard', standard.id)}
                         onClick={() => isSaved('standard', standard.id)
                           ? removeInsightItem(standard.id)
-                          : addInsightItem({
+                          : addWithPerformance({
                           type: 'standard',
                           id: standard.id,
                           title: standard.id,
@@ -984,6 +1301,22 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                     </div>
                   ))}
                 </div>
+
+                {/* 성취기준 직접 찾기 — 추천이 놓친 성취기준도 교사가 직접 검색해 담기 */}
+                <StandardFinder
+                  isSaved={isSaved}
+                  onRemove={removeInsightItem}
+                  onAdd={(standard) => addWithPerformance({
+                    type: 'standard',
+                    id: standard.id,
+                    title: standard.id,
+                    subtitle: `${standard.subject} · ${standard.grade ?? ''}`,
+                    detail: standard.content,
+                    performanceId: displayPerformance!.id,
+                    performanceTitle: displayPerformance!.title,
+                    savedAt: new Date().toISOString(),
+                  })}
+                />
               </section>
 
               {/* 연계 영화 */}
@@ -1044,7 +1377,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           onClick={e => {
                             e.stopPropagation();
                             if (isSaved('movie', String(movie.id))) { removeInsightItem(String(movie.id)); return; }
-                            addInsightItem({
+                            addWithPerformance({
                               type: 'movie',
                               id: String(movie.id),
                               title: movie.title,
@@ -1122,7 +1455,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           onClick={e => {
                             e.stopPropagation();
                             if (isSaved('book', book.isbn)) { removeInsightItem(book.isbn); return; }
-                            addInsightItem({
+                            addWithPerformance({
                               type: 'book',
                               id: book.isbn,
                               title: book.title,

@@ -193,6 +193,69 @@ export function matchedKeywordsFor(standard: AchievementStandard, keywords: stri
   return [...new Set(keywords.filter(k => k.length >= 2 && standard.content.includes(k)))].slice(0, 6);
 }
 
+// ---------- 전체 성취기준 직접 찾기 (ssdguide 스타일 4단계 필터 + 키워드 검색) ----------
+/** 전체 성취기준 DB를 반환한다(직접 찾기 패널용). */
+export async function getAllStandards(): Promise<AchievementStandard[]> {
+  return getDB();
+}
+
+export interface StandardFilter {
+  curriculumType?: CurriculumType | '';
+  grade?: string;
+  subject?: string;
+  domain?: string;
+  keyword?: string;
+}
+
+/**
+ * 4단계 필터(교육과정→학년군→교과→영역)와 키워드로 성취기준을 검색한다.
+ * 키워드는 코드·내용·교과·영역 전반에서 부분 일치로 찾는다.
+ * 자동/AI 추천이 놓치는 성취기준까지 교사가 직접 찾아 담을 수 있게 한다.
+ */
+export async function searchStandards(filter: StandardFilter, limit = 80): Promise<AchievementStandard[]> {
+  const db = await getDB();
+  const kw = (filter.keyword ?? '').trim();
+  const terms = kw ? kw.split(/\s+/).filter(Boolean) : [];
+
+  const result = db.filter(s => {
+    if (filter.curriculumType && s.curriculumType !== filter.curriculumType) return false;
+    if (filter.grade && s.grade !== filter.grade) return false;
+    if (filter.subject && s.subject !== filter.subject) return false;
+    if (filter.domain && (s.domain ?? '') !== filter.domain) return false;
+    if (terms.length > 0) {
+      const haystack = `${s.id} ${s.content} ${s.subject} ${s.domain ?? ''}`;
+      if (!terms.every(t => haystack.includes(t))) return false;
+    }
+    return true;
+  });
+
+  return result.slice(0, limit);
+}
+
+/** 현재 필터 상태에서 선택 가능한 하위 옵션들을 동적으로 산출한다(연쇄 필터). */
+export async function getStandardFacets(filter: StandardFilter): Promise<{
+  curriculumTypes: string[];
+  grades: string[];
+  subjects: string[];
+  domains: string[];
+}> {
+  const db = await getDB();
+  const within = (s: AchievementStandard, skip: keyof StandardFilter) => {
+    if (skip !== 'curriculumType' && filter.curriculumType && s.curriculumType !== filter.curriculumType) return false;
+    if (skip !== 'grade' && filter.grade && s.grade !== filter.grade) return false;
+    if (skip !== 'subject' && filter.subject && s.subject !== filter.subject) return false;
+    if (skip !== 'domain' && filter.domain && (s.domain ?? '') !== filter.domain) return false;
+    return true;
+  };
+  const uniq = (arr: string[]) => [...new Set(arr.filter(Boolean))];
+  return {
+    curriculumTypes: uniq(db.filter(s => within(s, 'curriculumType')).map(s => s.curriculumType)),
+    grades: uniq(db.filter(s => within(s, 'grade')).map(s => s.grade)),
+    subjects: uniq(db.filter(s => within(s, 'subject')).map(s => s.subject)).sort(),
+    domains: uniq(db.filter(s => within(s, 'domain')).map(s => s.domain ?? '')).sort(),
+  };
+}
+
 // ---------- 공개 API ----------
 export async function matchCurriculum(
   keywords: string[],

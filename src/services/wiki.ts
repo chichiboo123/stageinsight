@@ -33,16 +33,40 @@ export function cleanWorkTitle(raw: string): string {
   return t.replace(/\s{2,}/g, ' ').trim();
 }
 
-/** 검색으로 가장 적합한 문서 제목을 찾는다(동음이의 보정). */
-async function findBestTitle(query: string): Promise<string | null> {
+/**
+ * 위키 검색 결과 제목이 실제로 "그 작품"과 관련 있는지 검증한다.
+ * ────────────────────────────────────────────────────────────
+ * 위키백과 전문(全文) 검색은 본문에 검색어 일부가 포함된 엉뚱한 문서를
+ * 최상위로 돌려줄 수 있다. 예) "이상한 나라의 숨바꼭질"(뮤지컬)을 검색하면
+ * 줄거리에 "숨바꼭질 같은 사랑"이 있는 드라마 "보고싶다"가 매칭된다.
+ * → 작품명과 문서명이 제목 차원에서 겹치는지(부분 포함 또는 토큰 공유) 확인해
+ *   무관한 동음 매칭을 차단한다.
+ */
+function isPlausibleTitleMatch(query: string, found: string): boolean {
+  const norm = (s: string) => s.replace(/[\s·:|,~()[\]<>《》〈〉【】]/g, '');
+  const q = norm(query);
+  const f = norm(found);
+  if (!q || !f) return false;
+  // 한쪽이 다른 쪽을 포함하면 동일 작품으로 본다 (예: "오즈" ⊂ "오즈의 마법사")
+  if (f.includes(q) || q.includes(f)) return true;
+  // 의미 있는 토큰(2자 이상)을 하나라도 공유하면 관련 작품으로 본다
+  const qTokens = new Set(query.match(/[가-힣A-Za-z0-9]{2,}/g) ?? []);
+  const fTokens = found.match(/[가-힣A-Za-z0-9]{2,}/g) ?? [];
+  return fTokens.some(t => qTokens.has(t));
+}
+
+/** 검색으로 후보 문서 제목들을 가져온다(상위 N개). */
+async function searchTitles(query: string, limit = 5): Promise<string[]> {
   const params = new URLSearchParams({
     action: 'query', list: 'search', srsearch: query,
-    srlimit: '1', format: 'json', origin: '*',
+    srlimit: String(limit), format: 'json', origin: '*',
   });
   const res = await fetch(`${ACTION}?${params}`);
-  if (!res.ok) return null;
+  if (!res.ok) return [];
   const data = await res.json();
-  return data?.query?.search?.[0]?.title ?? null;
+  return (data?.query?.search ?? [])
+    .map((s: { title?: string }) => s.title ?? '')
+    .filter(Boolean);
 }
 
 async function fetchSummaryByTitle(title: string): Promise<WikiSummary | null> {
@@ -62,19 +86,29 @@ async function fetchSummaryByTitle(title: string): Promise<WikiSummary | null> {
 
 /**
  * 작품명으로 위키백과 요약을 가져온다.
- * 1) 검색으로 정확한 문서명을 찾고 2) 그 문서의 요약을 반환한다.
- * 실패 시 제목 직접 조회를 한 번 더 시도한다.
+ * 1) (장르 힌트를 더해) 검색한 뒤, 제목이 작품명과 관련 있는 후보만 채택하고
+ * 2) 그 문서의 요약을 반환한다. 무관한 동음 문서는 채택하지 않는다(오개념 차단).
+ *
+ * @param genre  공연 장르(예: "뮤지컬"). 검색 정확도를 높이는 힌트로 사용한다.
  */
-export async function fetchWikiSummary(rawTitle: string): Promise<WikiSummary | null> {
+export async function fetchWikiSummary(rawTitle: string, genre?: string): Promise<WikiSummary | null> {
   const title = cleanWorkTitle(rawTitle);
   if (!title) return null;
   try {
-    const best = await findBestTitle(title);
-    if (best) {
-      const summary = await fetchSummaryByTitle(best);
-      if (summary) return summary;
+    // 장르를 더한 검색 → 순수 제목 검색 순으로 시도(동명이작 혼동 완화)
+    const queries = genre ? [`${title} ${genre}`, title] : [title];
+    for (const q of queries) {
+      const candidates = await searchTitles(q, 5);
+      const best = candidates.find(c => isPlausibleTitleMatch(title, c));
+      if (best) {
+        const summary = await fetchSummaryByTitle(best);
+        if (summary) return summary;
+      }
     }
-    return await fetchSummaryByTitle(title);
+    // 제목 직접 조회: 단, 반환된 문서 제목이 작품명과 관련 있을 때만 채택
+    const direct = await fetchSummaryByTitle(title);
+    if (direct && isPlausibleTitleMatch(title, direct.title)) return direct;
+    return null;
   } catch {
     return null;
   }
