@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { aiLessonIdeas } from '../services/ai';
 import type { InsightBoard, InsightItem, InsightMemo, InsightPerformanceMeta, LessonPlan } from '../types';
@@ -202,6 +202,12 @@ function exportAsPDF(board: InsightBoard) {
 
 // ---------- 아이템 상세 팝업 ----------
 function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => void }) {
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, [onClose]);
+
   return (
     <div
       style={{
@@ -212,6 +218,9 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${item.title} 상세`}
         style={{
           background: 'var(--color-bg-primary)', borderRadius: '16px',
           padding: '24px', maxWidth: '560px', width: '100%', maxHeight: '85vh',
@@ -275,6 +284,12 @@ function lessonPlanToText(plan: LessonPlan, performanceTitle: string, meta?: Ins
   lines.push(`✨ AI 융합예술 수업 — ${plan.title || performanceTitle}`);
   if (plan.gradeBand) lines.push(`권장 학년군: ${plan.gradeBand}`);
   lines.push('');
+  // 작품 줄거리
+  if (plan.plotSummary) {
+    lines.push('[작품 줄거리]');
+    lines.push(plan.plotSummary);
+    lines.push('');
+  }
   // 작품 기본 정보
   const rows = metaToRows(meta);
   if (rows.length > 0 || plan.workSummary) {
@@ -325,6 +340,12 @@ function LessonPlanModal({
   onSaveMemo: () => void;
 }) {
   const infoRows = metaToRows(meta);
+  useEffect(() => {
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, [onClose]);
+
   return (
     <div
       style={{
@@ -335,6 +356,9 @@ function LessonPlanModal({
     >
       <div
         className="card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 융합예술 수업"
         style={{ maxWidth: '640px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '24px' }}
         onClick={e => e.stopPropagation()}
       >
@@ -349,16 +373,27 @@ function LessonPlanModal({
           </p>
         )}
         {error && (
-          <p style={{ padding: '16px', color: 'var(--color-accent-primary)', fontSize: '14px' }}>
+          <p style={{ padding: '16px', color: 'var(--color-danger)', fontSize: '14px' }} role="alert">
             {error}
           </p>
         )}
 
         {plan && !loading && (
           <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
-            {/* ① 작품 기본 정보 (사실 정보 + AI 요약) */}
+            {/* ① 작품 줄거리 (KOPIS 줄거리 또는 AI 지식 기반) */}
+            {plan.plotSummary && (
+              <div style={{
+                background: 'var(--color-info-bg)', border: '1px solid var(--color-border)',
+                borderRadius: 10, padding: '12px 14px', margin: '4px 0 12px',
+              }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 14 }}>📖 작품 줄거리</h4>
+                <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.7 }}>{plan.plotSummary}</p>
+              </div>
+            )}
+
+            {/* ② 작품 기본 정보 (사실 정보 + AI 요약) */}
             {(infoRows.length > 0 || plan.workSummary) && (
-              <div style={{ background: 'rgba(107,138,253,0.06)', borderRadius: 10, padding: '12px 14px', margin: '4px 0 12px' }}>
+              <div style={{ background: 'var(--color-bg-secondary)', borderRadius: 10, padding: '12px 14px', margin: '4px 0 12px' }}>
                 <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>🎭 작품 기본 정보</h4>
                 {infoRows.length > 0 && (
                   <ul style={{ margin: '0 0 6px', paddingLeft: 0, listStyle: 'none', display: 'grid', gap: 3 }}>
@@ -720,11 +755,11 @@ export function InsightPage({ onBack }: InsightPageProps) {
                     <span className="tag" style={{ fontSize: '11px' }}>
                       {group.items.length + group.memos.length}개
                     </span>
-                    {group.items.some(i => i.type === 'standard') && (
+                    {group.items.some(i => i.type === 'performance' || i.type === 'standard') && (
                       <button
                         className="btn btn-outline"
                         style={{ marginLeft: 'auto', fontSize: '12px', padding: '4px 10px' }}
-                        title="담긴 공연·성취기준·영화·도서로 AI 융합예술 수업을 설계합니다."
+                        title="담긴 공연·성취기준·영화·도서로 작품 줄거리부터 AI 융합예술 수업까지 설계합니다."
                         onClick={() => handleGenerateLesson(group)}
                       >
                         ✨ AI 융합수업 설계
