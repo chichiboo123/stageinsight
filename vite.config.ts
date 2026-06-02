@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+// @ts-expect-error - 서버 전용 mjs 모듈 (타입 선언 불필요)
+import { aiDevPlugin } from './server/vite-plugin-ai-dev.mjs';
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [react(), aiDevPlugin()],
   server: {
     proxy: {
       // KOPIS API CORS 우회 (개발 환경)

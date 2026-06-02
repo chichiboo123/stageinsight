@@ -304,7 +304,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   );
   const displayPerformance = detailedPerformance ?? selectedPerformance;
 
-  const { matches, loading: currLoading, activeFilters, setFilters } = useCurriculumMatch(displayPerformance);
+  const { matches, loading: currLoading, activeFilters, setFilters, aiLoading: currAiLoading, aiCurated } = useCurriculumMatch(displayPerformance);
 
   const availableGrades = useMemo(() => {
     const grades = [...new Set(matches.map(m => m.standard.grade))];
@@ -551,10 +551,23 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
               {/* 교육과정 성취기준 */}
               <section className={styles.section}>
                 <div className={styles.sectionHeader}>
-                  <h3 className="section-title">교육과정 성취기준</h3>
+                  <h3 className="section-title">
+                    교육과정 성취기준
+                    {aiCurated && (
+                      <span
+                        title="AI가 의미 기반으로 큐레이션한 결과입니다."
+                        style={{
+                          marginLeft: 8, fontSize: '11px', fontWeight: 600,
+                          color: 'var(--color-primary, #6b8afd)',
+                          background: 'rgba(107,138,253,0.12)',
+                          padding: '2px 7px', borderRadius: '10px', verticalAlign: 'middle',
+                        }}
+                      >✨ AI 큐레이션</span>
+                    )}
+                  </h3>
                   {matches.length > 0 && (
                     <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                      총 {matches.length}개 · {availableGrades.length}개 학년군
+                      {currAiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
                     </span>
                   )}
                 </div>
@@ -640,7 +653,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 )}
 
                 <div className={styles.standardGrid}>
-                  {displayedMatches.map(({ standard, matchedKeywords, score }) => (
+                  {displayedMatches.map(({ standard, matchedKeywords, score, aiReason, aiRelevance }) => (
                     <div key={standard.id} className={`card ${styles.standardCard}`}>
                       <div className={styles.standardMeta}>
                         <div className={styles.standardTags}>
@@ -649,13 +662,21 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           {standard.grade && <span className="tag">{standard.grade}</span>}
                         </div>
                         {score > 0 && (
-                          <span className={styles.score} title="매칭 점수">
-                            ★ {score}
+                          <span className={styles.score} title={aiRelevance ? 'AI 적합도' : '매칭 점수'}>
+                            {aiRelevance ? '✨' : '★'} {aiRelevance ?? score}
                           </span>
                         )}
                       </div>
                       <code className={styles.standardId}>{standard.id}</code>
                       <p className={styles.standardContent}>{standard.content}</p>
+                      {aiReason && (
+                        <p style={{
+                          fontSize: '12px', color: 'var(--color-text-muted)', margin: '6px 0 0',
+                          lineHeight: 1.45, fontStyle: 'italic',
+                        }}>
+                          💡 {aiReason}
+                        </p>
+                      )}
                       {matchedKeywords.length > 0 && (
                         <div className={styles.matchedKws}>
                           {matchedKeywords.slice(0, 6).map(kw => (
