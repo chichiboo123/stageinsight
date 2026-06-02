@@ -126,79 +126,189 @@ async function shareAsCompressedUrl(board: InsightBoard): Promise<string> {
   }
 }
 
-function exportAsImage(board: InsightBoard) {
-  const W = 760;
-  const PAD = 40;
-  const LH = 22;
+/**
+ * 인사이트 바구니를 고해상도 PNG 이미지로 내보낸다.
+ * ────────────────────────────────────────────────────────────
+ * 품질 개선 포인트:
+ *  - 화면 DPR과 무관하게 항상 3배(SCALE) 해상도로 렌더 → 어떤 기기에서도 선명
+ *  - 웹폰트 로드 완료(document.fonts.ready)를 기다린 뒤 그려 글자 깨짐 방지
+ *  - 길이를 잘라내지 않고 실제 폭 기준으로 줄바꿈(한글 친화) → 내용 누락 없음
+ *  - 2-패스 레이아웃으로 정확한 캔버스 높이 계산 → 불필요한 여백 제거
+ *  - 손실 압축(webp) 대신 무손실 PNG로 텍스트를 또렷하게 저장
+ */
+const IMG_FONT = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+
+/** maxWidth(px)에 맞춰 텍스트를 여러 줄로 나눈다(한글은 글자 단위, 공백은 보존). */
+function wrapCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const out: string[] = [];
+  for (const para of String(text).split('\n')) {
+    if (!para) { out.push(''); continue; }
+    let line = '';
+    for (const ch of para) {
+      const test = line + ch;
+      if (line && ctx.measureText(test).width > maxWidth) {
+        out.push(line);
+        line = ch;
+      } else {
+        line = test;
+      }
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+async function exportAsImage(board: InsightBoard) {
+  const SCALE = 3;        // 고해상도 렌더 배율
+  const W = 800;
+  const PAD = 44;
+  const CARD_PAD = 18;
+  const CONTENT_W = W - PAD * 2;
+  const ICONS: Record<string, string> = { performance: '🎭', standard: '📋', movie: '🎬', book: '📚' };
   const groups = groupByPerformance(board.items, board.memos);
 
-  let estimatedLines = 4;
-  for (const g of groups) {
-    estimatedLines += 2 + g.items.length * 2 + g.memos.reduce((acc, m) => acc + m.content.split('\n').length + 1, 0);
-  }
-  const H = Math.max(300, PAD * 2 + estimatedLines * LH + 80);
+  // 웹폰트가 준비된 뒤에 그려야 글자가 또렷하게 렌더된다.
+  try { await (document as Document & { fonts?: FontFaceSet }).fonts?.ready; } catch { /* 무시 */ }
 
+  // ── 1패스: 측정용 컨텍스트로 모든 줄바꿈/높이를 미리 계산 ──
+  const measure = document.createElement('canvas').getContext('2d')!;
+  type Op =
+    | { kind: 'text'; x: number; y: number; text: string; font: string; color: string }
+    | { kind: 'rect'; x: number; y: number; w: number; h: number; color: string; radius: number }
+    | { kind: 'line'; x: number; y: number; w: number; color: string };
+  const ops: Op[] = [];
+
+  const F_TITLE = `bold 28px ${IMG_FONT}`;
+  const F_GROUP = `bold 16px ${IMG_FONT}`;
+  const F_ITEM = `600 15px ${IMG_FONT}`;
+  const F_SUB = `13px ${IMG_FONT}`;
+  const F_DETAIL = `13px ${IMG_FONT}`;
+  const F_MEMO = `13px ${IMG_FONT}`;
+  const F_FOOT = `12px ${IMG_FONT}`;
+
+  let y = 56;
+  // 헤더
+  ops.push({ kind: 'text', x: PAD, y, text: '🛒 인사이트 바구니', font: F_TITLE, color: '#1f2937' });
+  y += 16;
+  const totalCount = board.items.length + board.memos.length;
+  ops.push({ kind: 'text', x: PAD, y, text: `총 ${totalCount}개 항목`, font: F_SUB, color: '#9ca3af' });
+  y += 30;
+
+  const innerW = CONTENT_W - CARD_PAD * 2;
+
+  for (const group of groups) {
+    const cardTop = y;
+    let cy = y + CARD_PAD + 18; // 카드 내부 첫 줄 baseline
+
+    // 그룹 헤더
+    const groupOps: Op[] = [];
+    groupOps.push({ kind: 'text', x: PAD + CARD_PAD, y: cy, text: `🎭 ${group.performanceTitle ?? '공연 미지정'}`, font: F_GROUP, color: '#4F46E5' });
+    cy += 26;
+
+    for (const item of group.items) {
+      const icon = ICONS[item.type] ?? '•';
+      measure.font = F_ITEM;
+      for (const line of wrapCanvasText(measure, `${icon}  ${item.title}`, innerW)) {
+        groupOps.push({ kind: 'text', x: PAD + CARD_PAD, y: cy, text: line, font: F_ITEM, color: '#1f2937' });
+        cy += 22;
+      }
+      if (item.subtitle) {
+        measure.font = F_SUB;
+        for (const line of wrapCanvasText(measure, item.subtitle, innerW - 16)) {
+          groupOps.push({ kind: 'text', x: PAD + CARD_PAD + 16, y: cy, text: line, font: F_SUB, color: '#6b7280' });
+          cy += 19;
+        }
+      }
+      if (item.type === 'standard' && item.detail) {
+        measure.font = F_DETAIL;
+        for (const line of wrapCanvasText(measure, item.detail, innerW - 16)) {
+          groupOps.push({ kind: 'text', x: PAD + CARD_PAD + 16, y: cy, text: line, font: F_DETAIL, color: '#6b7280' });
+          cy += 19;
+        }
+      }
+      cy += 6;
+    }
+
+    for (const memo of group.memos) {
+      measure.font = F_MEMO;
+      for (const line of wrapCanvasText(measure, `📝 ${memo.content}`, innerW)) {
+        groupOps.push({ kind: 'text', x: PAD + CARD_PAD, y: cy, text: line, font: F_MEMO, color: '#374151' });
+        cy += 20;
+      }
+      cy += 4;
+    }
+
+    const cardBottom = cy - 2 + CARD_PAD;
+    // 카드 배경(텍스트보다 먼저 그려지도록 ops 앞쪽에 push)
+    ops.push({ kind: 'rect', x: PAD, y: cardTop, w: CONTENT_W, h: cardBottom - cardTop, color: '#f8f9fc', radius: 14 });
+    ops.push(...groupOps);
+    y = cardBottom + 16;
+  }
+
+  // 푸터
+  const footY = y + 18;
+  ops.push({ kind: 'line', x: PAD, y: y + 2, w: CONTENT_W, color: '#e5e7eb' });
+  ops.push({ kind: 'text', x: PAD, y: footY, text: 'created by. 교육뮤지컬 꿈꾸는 치수쌤', font: F_FOOT, color: '#9ca3af' });
+  const H = footY + 24;
+
+  // ── 2패스: 실제 캔버스에 고해상도로 렌더 ──
   const canvas = document.createElement('canvas');
-  const dpr = Math.min(window.devicePixelRatio ?? 1, 2);
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
+  canvas.width = W * SCALE;
+  canvas.height = H * SCALE;
   const ctx = canvas.getContext('2d')!;
-  ctx.scale(dpr, dpr);
+  ctx.scale(SCALE, SCALE);
+  ctx.textBaseline = 'alphabetic';
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  // 배경 + 상단 강조 바
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#4F46E5';
   ctx.fillRect(0, 0, W, 6);
 
-  let y = 50;
-  ctx.fillStyle = '#1a1a1a';
-  ctx.font = 'bold 22px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  ctx.fillText('🛒 인사이트 바구니', PAD, y);
-  y += 36;
+  const roundRect = (x: number, yy: number, w: number, h: number, r: number) => {
+    const rad = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rad, yy);
+    ctx.arcTo(x + w, yy, x + w, yy + h, rad);
+    ctx.arcTo(x + w, yy + h, x, yy + h, rad);
+    ctx.arcTo(x, yy + h, x, yy, rad);
+    ctx.arcTo(x, yy, x + w, yy, rad);
+    ctx.closePath();
+  };
 
-  for (const group of groups) {
-    ctx.fillStyle = '#4F46E5';
-    ctx.font = 'bold 13px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-    ctx.fillText(`■ ${group.performanceTitle ?? '공연 미지정'}`, PAD, y);
-    y += 24;
-
-    for (const item of group.items) {
-      const label = { performance: '🎭', standard: '📋', movie: '🎬', book: '📚' }[item.type] ?? '•';
-      ctx.fillStyle = '#333333';
-      ctx.font = '13px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-      ctx.fillText(`${label}  ${item.title}`.slice(0, 70), PAD + 8, y);
-      y += LH;
-      if (item.subtitle) {
-        ctx.fillStyle = '#888888';
-        ctx.font = '11px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-        ctx.fillText('    ' + item.subtitle.slice(0, 80), PAD + 8, y);
-        y += LH - 4;
-      }
+  for (const op of ops) {
+    if (op.kind === 'rect') {
+      roundRect(op.x, op.y, op.w, op.h, op.radius);
+      ctx.fillStyle = op.color;
+      ctx.fill();
+      ctx.strokeStyle = '#e8eaf2';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    } else if (op.kind === 'line') {
+      ctx.strokeStyle = op.color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(op.x, op.y);
+      ctx.lineTo(op.x + op.w, op.y);
+      ctx.stroke();
+    } else {
+      ctx.font = op.font;
+      ctx.fillStyle = op.color;
+      ctx.fillText(op.text, op.x, op.y);
     }
-
-    for (const memo of group.memos) {
-      ctx.fillStyle = '#555555';
-      ctx.font = 'italic 12px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-      for (const line of memo.content.split('\n').slice(0, 3)) {
-        ctx.fillText('📝 ' + line.slice(0, 88), PAD + 8, y);
-        y += LH - 2;
-      }
-    }
-    y += 8;
   }
-
-  ctx.fillStyle = '#bbbbbb';
-  ctx.font = '11px "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  ctx.fillText('created by. 교육뮤지컬 꿈꾸는 치수쌤', PAD, H - 16);
 
   canvas.toBlob(blob => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = '인사이트바구니.webp';
+    a.download = '인사이트바구니.png';
     a.click();
     URL.revokeObjectURL(url);
-  }, 'image/webp');
+  }, 'image/png');
 }
 
 function exportAsPDF(board: InsightBoard) {
@@ -304,7 +414,6 @@ function metaToRows(meta: InsightPerformanceMeta | null | undefined): Array<{ la
 function lessonPlanToText(plan: LessonPlan, performanceTitle: string, meta?: InsightPerformanceMeta | null): string {
   const lines: string[] = [];
   lines.push(`✨ AI 융합예술 수업 — ${plan.title || performanceTitle}`);
-  if (plan.gradeBand) lines.push(`권장 학년군: ${plan.gradeBand}`);
   lines.push('');
   // 작품 줄거리
   if (plan.plotSummary) {
@@ -441,9 +550,6 @@ function LessonPlanModal({
               </>
             )}
 
-            {plan.gradeBand && (
-              <span className="tag" style={{ margin: '14px 0 8px', display: 'inline-block' }}>권장 학년군: {plan.gradeBand}</span>
-            )}
             {plan.overview && <p style={{ marginTop: 4 }}>{plan.overview}</p>}
 
             {plan.convergenceFocus && (
