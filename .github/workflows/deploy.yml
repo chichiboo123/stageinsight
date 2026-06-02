@@ -1,10 +1,11 @@
 name: Deploy to GitHub Pages
 
+# ⚠ 이 프로젝트는 Netlify를 주력 호스팅으로 사용합니다.
+#   GitHub Pages는 정적 호스팅이라 /api/* 프록시(KOPIS·네이버)와 AI 서버리스 함수를
+#   실행할 수 없어, 자동 배포 시 자산 404·기능 미동작을 일으킵니다.
+#   따라서 자동 트리거(push)를 제거하고 수동 실행(workflow_dispatch)만 남겨 둡니다.
+
 on:
-  push:
-    branches:
-      - main
-      - 'claude/**'
   workflow_dispatch:
 
 permissions:
