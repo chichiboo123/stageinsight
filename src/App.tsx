@@ -30,8 +30,9 @@ function AppInner() {
 
   // ── 페이지 상태 (localStorage 초기화 + 유효성 검사) ──
   const [page, setPageState] = useState<Page>(() => {
-    // URL share 파라미터가 있으면 insight 페이지로 시작
-    if (new URLSearchParams(window.location.search).has('share')) return 'insight';
+    // URL share/단축링크 파라미터가 있으면 insight 페이지로 시작
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.has('share') || sp.has('s')) return 'insight';
     const saved = localStorage.getItem(PAGE_KEY) as Page | null;
     // 학교나 공연장이 없으면 map/dashboard로 복원하지 않음
     if (saved === 'map' && !state.selectedSchool) return 'home';
@@ -45,6 +46,22 @@ function AppInner() {
   // ── URL share 초기 로드 ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // ── 단축 공유 링크(?s=<id>): 서버에서 보드를 불러온다 ──
+    const shortId = params.get('s');
+    if (shortId) {
+      fetch(`/api/share?id=${encodeURIComponent(shortId)}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((decoded: InsightBoard | null) => {
+          if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
+            loadInsightBoard(decoded);
+          }
+        })
+        .catch(() => { /* 실패 시 빈 바구니 유지 */ })
+        .finally(() => window.history.replaceState({}, '', window.location.pathname));
+      return;
+    }
+
     const shareParam = params.get('share');
     if (shareParam) {
       try {
