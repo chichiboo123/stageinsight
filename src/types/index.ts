@@ -96,6 +96,8 @@ export interface LessonActivity {
 
 export interface LessonPlan {
   title?: string;
+  workSummary?: string;        // 작품 소개·줄거리·기본정보 요약 (AI)
+  learningValue?: string[];    // 이 작품으로 가능한 학습(종합)
   overview: string;
   gradeBand?: string;
   convergenceFocus?: string;   // 공연·영화·도서를 잇는 융합 포인트
@@ -118,6 +120,7 @@ export interface PerformanceIntro {
 
 // ---------- AI 영화·도서 추천 큐레이션 ----------
 export interface MediaCuration {
+  themes?: string[];           // AI가 파악한 작품 핵심 주제(내용 기반 큐레이션 근거)
   movieSelections: Array<{ id: string; reason: string }>;
   bookSelections: Array<{ isbn: string; reason: string }>;
   movieQueries: string[];
@@ -155,6 +158,18 @@ export interface Book {
 }
 
 // ---------- 인사이트 보드 ----------
+// 공연 항목의 부가 정보 (AI 융합수업 설계 시 '작품 기본 정보'로 활용)
+export interface InsightPerformanceMeta {
+  genre?: string;
+  venue?: string;
+  price?: string;
+  runtime?: string;
+  rating?: string;     // 관람연령
+  period?: string;     // 공연기간 (YYYY.MM.DD ~ YYYY.MM.DD)
+  child?: boolean;     // 아동관람가 여부
+  keywords?: string[];
+}
+
 export interface InsightItem {
   type: 'performance' | 'standard' | 'movie' | 'book';
   id: string;
@@ -162,6 +177,7 @@ export interface InsightItem {
   subtitle?: string;
   thumbnail?: string;
   detail?: string;           // 전체 내용 (시놉시스, 줄거리, 성취기준 내용 등)
+  meta?: InsightPerformanceMeta;  // 공연 항목의 기본 정보(수업 설계용)
   performanceId?: string;    // 담을 때 선택된 공연 ID (그룹핑용)
   performanceTitle?: string; // 담을 때 선택된 공연명
   savedAt: string;           // ISO 날짜

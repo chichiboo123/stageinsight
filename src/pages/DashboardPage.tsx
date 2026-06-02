@@ -350,7 +350,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const {
     movies, books, moviesLoading, booksLoading, moviesError, booksError,
     curate: curateMedia, curating: mediaCurating, curated: mediaCurated,
-    curateError: mediaCurateError, canCurate: canCurateMedia,
+    curateError: mediaCurateError, canCurate: canCurateMedia, aiThemes: mediaThemes,
   } = useMediaRecommendations(displayPerformance);
 
   const handlePosterClick = useCallback((src: string) => {
@@ -624,6 +624,17 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       subtitle: displayPerformance!.venue,
                       thumbnail: displayPerformance!.poster,
                       detail: displayPerformance!.synopsis,
+                      // AI 융합수업 설계 시 '작품 기본 정보'로 활용
+                      meta: {
+                        genre: displayPerformance!.genre,
+                        venue: displayPerformance!.venue,
+                        price: displayPerformance!.price,
+                        runtime: displayPerformance!.runtime,
+                        rating: displayPerformance!.rating,
+                        period: `${formatDate(displayPerformance!.startDate)} ~ ${formatDate(displayPerformance!.endDate)}`,
+                        child: displayPerformance!.child,
+                        keywords: displayPerformance!.keywords,
+                      },
                       performanceId: displayPerformance!.id,
                       performanceTitle: displayPerformance!.title,
                       savedAt: new Date().toISOString(),
@@ -822,10 +833,19 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   </button>
                   {mediaCurated && (
                     <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                      공연 연계 관점으로 큐레이션된 결과입니다.
+                      작품 내용·주제를 분석해 큐레이션한 결과입니다.
                     </span>
                   )}
                 </div>
+                {/* AI가 파악한 작품 핵심 주제 (내용 기반 큐레이션 근거) */}
+                {mediaCurated && mediaThemes.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>🎯 작품 주제:</span>
+                    {mediaThemes.map(t => (
+                      <span key={t} className="tag" style={{ fontSize: 11 }}>{t}</span>
+                    ))}
+                  </div>
+                )}
                 {mediaCurateError && (
                   <p style={{ fontSize: 12, color: 'var(--color-accent-primary)', marginTop: 6 }}>{mediaCurateError}</p>
                 )}

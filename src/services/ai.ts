@@ -17,7 +17,7 @@ import type {
 } from '../types';
 import { setAIStatus } from './aiStatus';
 
-const CACHE_PREFIX = 'ai-cache:v2:';
+const CACHE_PREFIX = 'ai-cache:v3:';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30일
 
 function cacheGet<T>(key: string): T | null {
@@ -125,6 +125,14 @@ export async function aiLessonIdeas(params: {
   performanceTitle: string;
   genre?: string;
   synopsis?: string;
+  // 작품 기본 정보 (있으면 함께 전달 → 작품 소개·학습가치 종합 답변에 활용)
+  runtime?: string;
+  rating?: string;
+  venue?: string;
+  price?: string;
+  period?: string;
+  child?: boolean;
+  keywords?: string[];
   standards: Array<Pick<AchievementStandard, 'id' | 'grade' | 'subject' | 'content'>>;
   movies: string[];
   books: string[];
@@ -137,6 +145,13 @@ export async function aiLessonIdeas(params: {
     performanceTitle: params.performanceTitle,
     genre: params.genre,
     synopsis: params.synopsis,
+    runtime: params.runtime,
+    rating: params.rating,
+    venue: params.venue,
+    price: params.price,
+    period: params.period,
+    child: params.child,
+    keywords: params.keywords,
     standards: params.standards,
     movies: params.movies,
     books: params.books,
@@ -180,6 +195,9 @@ export async function aiCurateMedia(
       title: performance.title,
       genre: performance.genre,
       synopsis: performance.synopsis ?? '',
+      // 내용 기반 큐레이션: 키워드·관람연령까지 전달해 작품 '내용'을 더 깊이 이해시킨다
+      keywords: performance.keywords ?? [],
+      rating: performance.rating ?? '',
     },
     movies: movies.map(m => ({ id: m.id, title: m.title, overview: m.overview })),
     books: books.map(b => ({ isbn: b.isbn, title: b.title, description: b.description })),

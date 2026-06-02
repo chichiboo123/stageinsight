@@ -94,7 +94,16 @@ export async function rerankCurriculum(body, apiKey) {
 export async function lessonIdeas(body, apiKey) {
   const performanceTitle = String(body?.performanceTitle ?? '').slice(0, 120);
   const genre = String(body?.genre ?? '').slice(0, 20);
-  const synopsis = String(body?.synopsis ?? '').slice(0, 500);
+  const synopsis = String(body?.synopsis ?? '').slice(0, 700);
+  // 작품 기본 정보(주어진 사실만 사용 — 지어내지 않게 프롬프트로 지시)
+  const runtime = String(body?.runtime ?? '').slice(0, 30);
+  const rating = String(body?.rating ?? '').slice(0, 30);
+  const venue = String(body?.venue ?? '').slice(0, 80);
+  const price = String(body?.price ?? '').slice(0, 160);
+  const period = String(body?.period ?? '').slice(0, 60);
+  const child = typeof body?.child === 'boolean' ? body.child : undefined;
+  const keywords = (Array.isArray(body?.keywords) ? body.keywords : [])
+    .slice(0, 12).map(k => String(k).slice(0, 20));
   const standards = (Array.isArray(body?.standards) ? body.standards : [])
     .slice(0, 8)
     .map(s => ({
@@ -108,16 +117,24 @@ export async function lessonIdeas(body, apiKey) {
 
   const system =
     '너는 한국 초·중·고 교사의 융합예술수업 설계를 돕는 교육 컨설턴트다. ' +
-    '제시된 "공연"을 중심에 두고, 연계 영화·도서를 매체로 엮어 ' +
-    '하나의 흐름이 있는 융합 수업(공연 감상 → 매체 연계 → 표현·창작 활동)을 설계한다. ' +
-    '성취기준의 학년 수준에 맞춰 활동 난이도를 조정하고, 한국 교실에서 바로 적용 가능하게 쓴다. ' +
-    '영화·도서는 공연 주제를 확장·심화하는 연결고리로 구체적으로 활용한다. ' +
+    '아래 순서로 교사에게 실질적으로 도움이 되는 종합 답변을 작성한다.\n' +
+    '① 작품 이해: 제공된 줄거리·기본정보(장르·관람연령·러닝타임·공연기간)·공연장·티켓 금액을 ' +
+    'workSummary에 자연스러운 2~4문장으로 정리한다. ★주어진 사실만 사용하고, 없는 정보(가격·공연장 등)는 ' +
+    '추측하거나 지어내지 말고 생략한다.\n' +
+    '② 학습 가치: 이 작품을 통해 학생이 무엇을 배울 수 있는지(교과 지식·핵심역량·정서·태도·진로 등)를 ' +
+    'learningValue에 구체적 항목으로 종합 제시한다.\n' +
+    '③ 융합 수업 설계: 공연을 중심에 두고 연계 영화·도서를 매체로 엮어 하나의 흐름이 있는 수업' +
+    '(공연 감상 → 매체 연계 → 표현·창작 활동)을 설계한다. 성취기준의 학년 수준에 맞춰 난이도를 조정하고, ' +
+    '한국 교실에서 바로 적용 가능하게 쓴다. 영화·도서는 공연 주제를 확장·심화하는 연결고리로 구체적으로 활용한다.\n' +
     '모든 내용은 한국어로, 과장 없이 신뢰성 있게 작성한다.';
 
   const user = JSON.stringify({
     중심공연: performanceTitle,
-    장르: genre,
+    기본정보: { 장르: genre, 관람연령: rating, 러닝타임: runtime, 공연기간: period, 아동관람가: child },
+    공연장: venue,
+    티켓금액: price,
     줄거리: synopsis,
+    키워드: keywords,
     성취기준: standards,
     연계영화: movies,
     연계도서: books,
@@ -127,6 +144,8 @@ export async function lessonIdeas(body, apiKey) {
     type: T.OBJECT,
     properties: {
       title: { type: T.STRING },                 // 수업 제목
+      workSummary: { type: T.STRING },           // ① 작품 소개·줄거리·기본정보 요약
+      learningValue: { type: T.ARRAY, items: { type: T.STRING } }, // ② 이 작품으로 가능한 학습(종합)
       overview: { type: T.STRING },              // 수업 개요(2~3문장)
       gradeBand: { type: T.STRING },             // 권장 학년군
       convergenceFocus: { type: T.STRING },      // 공연·영화·도서를 잇는 융합 포인트
@@ -151,11 +170,14 @@ export async function lessonIdeas(body, apiKey) {
   };
 
   const { json, model } = await callGeminiJSON({
-    apiKey, system, user, schema, temperature: 0.6, maxOutputTokens: 2300,
+    apiKey, system, user, schema, temperature: 0.6, maxOutputTokens: 4096,
   });
 
+  const arr = (a, n) => (a ?? []).map(String).map(s => s.trim()).filter(Boolean).slice(0, n);
   return {
     title: json?.title ? String(json.title) : undefined,
+    workSummary: json?.workSummary ? String(json.workSummary) : undefined,
+    learningValue: arr(json?.learningValue, 8),
     overview: String(json?.overview ?? ''),
     gradeBand: String(json?.gradeBand ?? ''),
     convergenceFocus: json?.convergenceFocus ? String(json.convergenceFocus) : undefined,
@@ -224,36 +246,43 @@ export async function introducePerformance(body, apiKey) {
    ============================================================ */
 export async function curateMedia(body, apiKey) {
   const performance = body?.performance ?? {};
+  const keywords = (Array.isArray(performance.keywords) ? performance.keywords : [])
+    .slice(0, 12).map(k => String(k).slice(0, 20));
   const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 24).map(m => ({
     id: String(m.id),
     t: String(m.title ?? '').slice(0, 60),
-    o: String(m.overview ?? '').slice(0, 140),
+    o: String(m.overview ?? '').slice(0, 160),
   }));
   const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 24).map(b => ({
     isbn: String(b.isbn),
     t: String(b.title ?? '').slice(0, 60),
-    o: String(b.description ?? '').slice(0, 140),
+    o: String(b.description ?? '').slice(0, 160),
   }));
 
   const system =
     '너는 공연 연계 수업 자료를 큐레이션하는 사서·영화 교사다. ' +
-    '주어진 "공연"과 교육적으로 연관성이 높은 영화·도서를 후보 목록에서 골라 랭킹한다. ' +
-    '연관성은 주제·정서·소재의 일치를 기준으로 하며, 단순히 제목 단어가 겹치는 것은 배제한다. ' +
-    '학생에게 부적합하거나 무관한 후보는 제외한다. 근거(reason)는 공연과의 연결점을 ' +
+    '먼저 주어진 "공연"의 줄거리·장르·키워드·관람연령을 근거로 작품의 핵심 주제·정서·소재·' +
+    '학습 개념을 깊이 파악한다. (제목의 표면 단어가 아니라 작품의 "내용"을 이해한다.) ' +
+    '파악한 핵심 주제는 themes에 3~6개의 짧은 구로 적는다. ' +
+    '그 이해를 바탕으로, 후보 목록에서 작품 "내용"과 교육적으로 연결되는 영화·도서를 골라 랭킹한다. ' +
+    '연관성은 주제·정서·소재·메시지의 일치를 기준으로 하며, 단순히 제목 단어가 겹치는 것은 배제한다. ' +
+    '학생에게 부적합하거나 무관한 후보는 제외한다. 근거(reason)는 공연 "내용"과의 연결점을 ' +
     '한국어 한 문장(40자 이내)으로 쓴다. 반드시 후보의 id/isbn만 사용한다. ' +
-    '★중요: 어떤 공연이든 주제·소재 면에서 연결되는 영화·도서는 반드시 존재한다. ' +
-    '후보가 비어 있거나 빈약하더라도, 이 공연의 주제·정서·소재·대상연령에 맞는 ' +
-    '작품을 한국 도서관·극장에서 찾을 수 있도록 movieQueries와 bookQueries를 ' +
-    '"각각 반드시 3~4개씩" 제안한다(절대 빈 배열 금지). ' +
-    '검색어는 너무 일반적인 한 단어(음악, 이야기, 사랑 등)를 피하고, ' +
-    '주제를 드러내는 구체적 2~4어절 구(예: "우정과 성장 동화", "환경을 지키는 모험")로 쓴다. ' +
+    '★중요: 어떤 공연이든 내용·주제 면에서 연결되는 영화·도서는 반드시 존재한다. ' +
+    '후보가 비어 있거나 빈약하더라도, 작품의 주제·정서·소재·대상연령에 맞는 작품을 ' +
+    '한국 도서관·극장에서 찾을 수 있도록 movieQueries와 bookQueries를 "각각 반드시 4~6개씩" 제안한다(절대 빈 배열 금지). ' +
+    '검색어는 제목을 그대로 쓰지 말고 작품의 내용·주제를 드러내는 구체적 2~5어절 구로 쓴다 ' +
+    '(예: "우정으로 성장하는 아이들", "환경을 지키는 모험 이야기", "가족의 화해를 다룬 동화"). ' +
+    '너무 일반적인 한 단어(음악, 이야기, 사랑 등)는 피한다. ' +
     '도서 검색어는 그림책·동화·청소년 도서 등 학생 눈높이를 고려한다.';
 
   const user = JSON.stringify({
     공연: {
       제목: performance.title ?? '',
       장르: performance.genre ?? '',
-      줄거리: String(performance.synopsis ?? '').slice(0, 500),
+      관람연령: performance.rating ?? '',
+      줄거리: String(performance.synopsis ?? '').slice(0, 600),
+      키워드: keywords,
     },
     영화후보: movies,
     도서후보: books,
@@ -262,6 +291,7 @@ export async function curateMedia(body, apiKey) {
   const schema = {
     type: T.OBJECT,
     properties: {
+      themes: { type: T.ARRAY, items: { type: T.STRING } },  // 작품 핵심 주제(내용 이해 근거)
       movieSelections: {
         type: T.ARRAY,
         items: {
@@ -285,7 +315,7 @@ export async function curateMedia(body, apiKey) {
   };
 
   const { json, model } = await callGeminiJSON({
-    apiKey, system, user, schema, temperature: 0.3, maxOutputTokens: 1500,
+    apiKey, system, user, schema, temperature: 0.3, maxOutputTokens: 1800,
   });
 
   const validMovie = new Set(movies.map(m => m.id));
@@ -293,6 +323,7 @@ export async function curateMedia(body, apiKey) {
   const arr = (a, n) => [...new Set((a ?? []).map(s => String(s).trim()).filter(Boolean))].slice(0, n);
 
   return {
+    themes: arr(json?.themes, 6),
     movieSelections: (json?.movieSelections ?? [])
       .filter(s => s && validMovie.has(String(s.id)))
       .slice(0, 12)
@@ -301,8 +332,8 @@ export async function curateMedia(body, apiKey) {
       .filter(s => s && validBook.has(String(s.isbn)))
       .slice(0, 12)
       .map(s => ({ isbn: String(s.isbn), reason: String(s.reason ?? '').slice(0, 60) })),
-    movieQueries: arr(json?.movieQueries, 4),
-    bookQueries: arr(json?.bookQueries, 4),
+    movieQueries: arr(json?.movieQueries, 6),
+    bookQueries: arr(json?.bookQueries, 6),
     _model: model,
   };
 }

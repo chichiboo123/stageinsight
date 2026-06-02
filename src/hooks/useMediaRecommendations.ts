@@ -21,6 +21,7 @@ interface MediaState {
   // AI 큐레이션 결과
   aiMovies: Movie[];
   aiBooks: Book[];
+  aiThemes: string[];   // AI가 파악한 작품 핵심 주제(내용 기반 큐레이션 근거)
   moviesLoading: boolean;
   booksLoading: boolean;
   moviesError: string | null;
@@ -40,10 +41,11 @@ interface MediaReturn {
   curated: boolean;
   curateError: string | null;
   canCurate: boolean;
+  aiThemes: string[];       // AI가 파악한 작품 핵심 주제
 }
 
 const EMPTY: MediaState = {
-  baseMovies: [], baseBooks: [], aiMovies: [], aiBooks: [],
+  baseMovies: [], baseBooks: [], aiMovies: [], aiBooks: [], aiThemes: [],
   moviesLoading: false, booksLoading: false, moviesError: null, booksError: null,
 };
 
@@ -68,7 +70,7 @@ export function useMediaRecommendations(performance: Performance | null): MediaR
     let cancelled = false;
     setState(prev => ({
       ...prev,
-      aiMovies: [], aiBooks: [],
+      aiMovies: [], aiBooks: [], aiThemes: [],
       moviesLoading: true, booksLoading: true, moviesError: null, booksError: null,
     }));
     setCurated(false);
@@ -144,7 +146,12 @@ export function useMediaRecommendations(performance: Performance | null): MediaR
         }
       }
 
-      setState(prev => ({ ...prev, aiMovies: aiMovies.slice(0, 20), aiBooks: aiBooks.slice(0, 20) }));
+      setState(prev => ({
+        ...prev,
+        aiMovies: aiMovies.slice(0, 20),
+        aiBooks: aiBooks.slice(0, 20),
+        aiThemes: cur.themes ?? [],
+      }));
       setCurated(true);
     } catch (err) {
       setCurateError(
@@ -168,6 +175,7 @@ export function useMediaRecommendations(performance: Performance | null): MediaR
     curating,
     curated,
     curateError,
+    aiThemes: state.aiThemes,
     // 기본 추천이 0개여도(=관련 작품이 안 잡힌 공연) AI 큐레이션은 가능해야 한다.
     // → 정밀 검색어 보강으로 의미 있는 결과를 새로 찾아낸다.
     canCurate: performance !== null && !state.moviesLoading && !state.booksLoading,
