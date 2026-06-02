@@ -156,6 +156,13 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim();
 }
 
+// KOPIS 이미지 URL이 http로 내려오면 HTTPS 페이지에서 Mixed Content 경고가 발생한다.
+// → https로 승급해 브라우저 경고를 제거한다.
+function httpsify(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  return url.replace(/^http:\/\//i, 'https://');
+}
+
 function getTagContent(xml: string, tag: string): string {
   const match = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`).exec(xml);
   if (!match) return '';
@@ -187,7 +194,7 @@ function parsePerformanceListXml(xml: string): Performance[] {
       state: mapState(getTagContent(db, 'prfstate')),
       startDate: getTagContent(db, 'prfpdfrom'),
       endDate: getTagContent(db, 'prfpdto'),
-      poster: getTagContent(db, 'poster') || undefined,
+      poster: httpsify(getTagContent(db, 'poster')) || undefined,
       rating: getTagContent(db, 'prfage') || undefined,
       child: childRaw === 'Y' ? true : childRaw === 'N' ? false : undefined,
       keywords: [],
@@ -205,7 +212,7 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
     // styurls > styurl (공연 소개 이미지)
     const styurlsMatch = /<styurls>([\s\S]*?)<\/styurls>/.exec(db);
     const images = styurlsMatch
-      ? getAllTags(styurlsMatch[1], 'styurl').map(u => u.trim()).filter(Boolean)
+      ? getAllTags(styurlsMatch[1], 'styurl').map(u => httpsify(u.trim())).filter((u): u is string => Boolean(u))
       : [];
 
     // relates > relate (관련 동영상)
@@ -229,7 +236,7 @@ function parsePerformanceDetailXml(xml: string): Performance[] {
       state: mapState(getTagContent(db, 'prfstate')),
       startDate: getTagContent(db, 'prfpdfrom'),
       endDate: getTagContent(db, 'prfpdto'),
-      poster: getTagContent(db, 'poster') || undefined,
+      poster: httpsify(getTagContent(db, 'poster')) || undefined,
       runtime: getTagContent(db, 'prfruntime') || undefined,
       rating: getTagContent(db, 'prfage') || undefined,
       price: getTagContent(db, 'pcseguidance') || undefined,

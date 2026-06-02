@@ -59,7 +59,8 @@ async function postAI<T extends { _model?: string | null }>(
     const res = await fetch(`/api/ai/${handler}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      // __handler: 경로 splat 라우팅이 어긋나도 서버가 핸들러를 식별하도록 body에도 포함
+      body: JSON.stringify({ ...(body as object), __handler: handler }),
       signal,
     });
     if (!res.ok) {

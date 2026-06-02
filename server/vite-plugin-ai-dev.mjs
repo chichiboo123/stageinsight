@@ -6,8 +6,9 @@
  */
 
 import { loadEnv } from 'vite';
-import { HANDLERS } from './handlers.mjs';
-import { GeminiError } from './gemini.mjs';
+// 운영(Netlify Functions)과 동일한 핸들러를 재사용한다.
+import { HANDLERS } from '../netlify/functions/_handlers.mjs';
+import { GeminiError } from '../netlify/functions/_gemini.mjs';
 
 export function aiDevPlugin() {
   return {
