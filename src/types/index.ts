@@ -82,6 +82,32 @@ export interface CurriculumMatch {
   standard: AchievementStandard;
   score: number;          // 매칭 점수 (0~1)
   matchedKeywords: string[];
+  aiReason?: string;       // AI가 제시한 연계 근거 (한 문장)
+  aiRelevance?: number;    // AI 적합도 1~5 (AI 큐레이션 시)
+}
+
+// ---------- AI 수업 아이디어 (Phase 2) ----------
+export interface LessonActivity {
+  title: string;
+  description: string;
+  duration?: string;
+}
+
+export interface LessonPlan {
+  overview: string;
+  gradeBand?: string;
+  objectives: string[];
+  activities: LessonActivity[];
+  discussionQuestions: string[];
+  assessment?: string;
+}
+
+// ---------- AI 공연 의미 보강 (Phase 3) ----------
+export interface PerformanceEnrichment {
+  themes: string[];
+  curriculumKeywords: string[];
+  movieQueries: string[];
+  bookQueries: string[];
 }
 
 // ---------- 영화 (TMDB) ----------

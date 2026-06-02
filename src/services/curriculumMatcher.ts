@@ -148,6 +148,51 @@ function computeScore(
   return { score, matchedKeywords: [...matched] };
 }
 
+// ---------- AI 후보 풀 ----------
+// 키워드 점수 상위 후보를 학년군 다양성과 함께 추려 AI 재정렬에 전달한다.
+// (전체 3,373건을 LLM에 넣지 않고 소량만 보내 토큰을 절약한다)
+export async function getCandidatePool(
+  keywords: string[],
+  synopsis: string,
+  filterTypes?: CurriculumType[],
+  poolSize = 40,
+): Promise<AchievementStandard[]> {
+  const db = await getDB();
+  const filtered = filterTypes && filterTypes.length > 0
+    ? db.filter(s => filterTypes.includes(s.curriculumType))
+    : db;
+
+  const synopsisTokens = synopsis ? extractKoreanTokens(synopsis) : [];
+  const titleTokens = keywords.filter(k => k.length >= 2);
+
+  const scored = filtered
+    .map(standard => ({
+      standard,
+      ...computeScore(standard, keywords, synopsisTokens, titleTokens),
+    }))
+    .filter(m => m.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  // 학년군 다양성: 학년군당 최대 8개까지 허용하며 poolSize까지 채움
+  const GRADE_CAP = 8;
+  const gradeCount = new Map<string, number>();
+  const pool: AchievementStandard[] = [];
+  for (const m of scored) {
+    const g = m.standard.grade ?? '기타';
+    const cnt = gradeCount.get(g) ?? 0;
+    if (cnt >= GRADE_CAP) continue;
+    pool.push(m.standard);
+    gradeCount.set(g, cnt + 1);
+    if (pool.length >= poolSize) break;
+  }
+  return pool;
+}
+
+// 특정 성취기준 내용에 등장하는 작품 키워드 추출 (UI 칩 표시용)
+export function matchedKeywordsFor(standard: AchievementStandard, keywords: string[]): string[] {
+  return [...new Set(keywords.filter(k => k.length >= 2 && standard.content.includes(k)))].slice(0, 6);
+}
+
 // ---------- 공개 API ----------
 export async function matchCurriculum(
   keywords: string[],

@@ -1,17 +1,27 @@
 /**
  * useCurriculumMatch
- * - 공연 키워드 + 줄거리 → 교육과정 성취기준 자동 매칭
- * - 교육과정 유형 필터 지원 (2022개정 / 2019누리 / 2022특수)
+ * - 공연 키워드 + 줄거리 → 교육과정 성취기준 매칭
+ * - 2단계 전략(토큰 효율 + 신뢰성):
+ *   1) 즉시: 키워드 기반 로컬 매칭으로 결과를 바로 보여준다 (폴백 보장)
+ *   2) 보강: 키워드로 추린 후보(최대 40개)만 AI에 보내 의미적으로 재정렬·근거 부여
+ *   AI 호출 실패(쿼터/오프라인/키 미설정) 시 1)의 결과를 그대로 유지한다.
  */
 
 import { useState, useEffect } from 'react';
-import { matchCurriculum } from '../services/curriculumMatcher';
+import {
+  matchCurriculum,
+  getCandidatePool,
+  matchedKeywordsFor,
+} from '../services/curriculumMatcher';
+import { aiRerankCurriculum } from '../services/ai';
 import type { Performance, CurriculumMatch, CurriculumType, ApiState } from '../types';
 
 interface UseCurriculumMatchReturn extends ApiState<CurriculumMatch[]> {
   matches: CurriculumMatch[];
   activeFilters: CurriculumType[];
   setFilters: (filters: CurriculumType[]) => void;
+  aiLoading: boolean;   // AI 재정렬 진행 중
+  aiCurated: boolean;   // 현재 결과가 AI 큐레이션 결과인지
 }
 
 export function useCurriculumMatch(
@@ -23,14 +33,17 @@ export function useCurriculumMatch(
     loading: false,
     error: null,
   });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiCurated, setAiCurated] = useState(false);
 
   useEffect(() => {
     if (!performance) {
       setState({ data: null, loading: false, error: null });
+      setAiLoading(false);
+      setAiCurated(false);
       return;
     }
 
-    // 상세 데이터(keywords 또는 synopsis)가 로드되기 전이면 대기
     const keywords = performance.keywords ?? [];
     const synopsis = performance.synopsis ?? '';
     if (keywords.length === 0 && !synopsis) {
@@ -39,17 +52,21 @@ export function useCurriculumMatch(
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     setState({ data: null, loading: true, error: null });
+    setAiCurated(false);
+    setAiLoading(false);
 
-    matchCurriculum(
-      keywords,
-      synopsis,
-      activeFilters.length > 0 ? activeFilters : undefined,
-    )
-      .then(matches => {
-        if (!cancelled) setState({ data: matches, loading: false, error: null });
-      })
-      .catch(err => {
+    (async () => {
+      // 1단계: 로컬 키워드 매칭 (즉시 표시 + 폴백)
+      let baseline: CurriculumMatch[] = [];
+      try {
+        baseline = await matchCurriculum(
+          keywords,
+          synopsis,
+          activeFilters.length > 0 ? activeFilters : undefined,
+        );
+      } catch (err) {
         if (!cancelled) {
           setState({
             data: null,
@@ -57,9 +74,57 @@ export function useCurriculumMatch(
             error: err instanceof Error ? err.message : '교육과정 매칭 중 오류가 발생했습니다.',
           });
         }
-      });
+        return;
+      }
+      if (cancelled) return;
+      setState({ data: baseline, loading: false, error: null });
 
-    return () => { cancelled = true; };
+      // 2단계: AI 재정렬 (실패 시 baseline 유지)
+      setAiLoading(true);
+      try {
+        const pool = await getCandidatePool(
+          keywords,
+          synopsis,
+          activeFilters.length > 0 ? activeFilters : undefined,
+          40,
+        );
+        const selections = await aiRerankCurriculum(performance, pool, 12, controller.signal);
+        if (cancelled) return;
+
+        if (selections && selections.length > 0) {
+          const poolMap = new Map(pool.map(s => [s.id, s]));
+          const baselineKw = new Map(baseline.map(m => [m.standard.id, m.matchedKeywords]));
+          const curated: CurriculumMatch[] = selections
+            .map(sel => {
+              const standard = poolMap.get(sel.id);
+              if (!standard) return null;
+              return {
+                standard,
+                score: sel.relevance,
+                matchedKeywords:
+                  baselineKw.get(sel.id) ?? matchedKeywordsFor(standard, keywords),
+                aiReason: sel.reason,
+                aiRelevance: sel.relevance,
+              } as CurriculumMatch;
+            })
+            .filter((m): m is CurriculumMatch => m !== null);
+
+          if (curated.length > 0) {
+            setState({ data: curated, loading: false, error: null });
+            setAiCurated(true);
+          }
+        }
+      } catch {
+        /* AI 실패 → baseline 유지 */
+      } finally {
+        if (!cancelled) setAiLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [performance, activeFilters]);
 
   return {
@@ -69,5 +134,7 @@ export function useCurriculumMatch(
     data: state.data,
     activeFilters,
     setFilters,
+    aiLoading,
+    aiCurated,
   };
 }

@@ -115,13 +115,16 @@ function extractTitleTerms(title: string): string[] {
 export async function recommendMoviesForPerformance(
   performanceTitle: string,
   keywords: string[] = [],
+  aiQueries: string[] = [],
 ): Promise<Movie[]> {
   const titleTerms = extractTitleTerms(performanceTitle);
 
+  // 0차: AI 주제 검색어 각각 검색 (정확도 높음 → 앞쪽 배치)
   // 1차: 공연 제목 및 부제 각각 검색
   // 2차: 키워드로 검색
   // 중복 제거 후 상위 20개 반환
   const searchPromises = [
+    ...aiQueries.slice(0, 6).map(q => searchMoviesByKeywords([], q).catch(() => [] as Movie[])),
     ...titleTerms.map(t => searchMoviesByKeywords([], t).catch(() => [] as Movie[])),
     keywords.length > 0
       ? searchMoviesByKeywords(keywords).catch(() => [] as Movie[])

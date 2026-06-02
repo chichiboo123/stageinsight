@@ -107,11 +107,13 @@ export async function recommendBooksForPerformance(
   performanceTitle: string,
   keywords: string[] = [],
   genre?: string,
+  aiQueries: string[] = [],
 ): Promise<Book[]> {
   const titleTerms = extractTitleTerms(performanceTitle);
   // 제목 전체 + 부제 각각 + 단순 장르 단어 제외한 특정 키워드만
   const specificKeywords = keywords.filter(kw => !GENERIC_BOOK_TERMS.has(kw));
-  const queries = [...new Set([performanceTitle, ...titleTerms, ...specificKeywords])].slice(0, 6);
+  // AI 주제 검색어를 앞쪽에 배치(정확도 우선), 이후 제목·키워드 보강
+  const queries = [...new Set([...aiQueries, performanceTitle, ...titleTerms, ...specificKeywords])].slice(0, 8);
 
   // 뮤지컬 장르면 고정 도서 검색 (저자명 없이 제목만으로)
   const musicalBookPromise = genre === '뮤지컬'

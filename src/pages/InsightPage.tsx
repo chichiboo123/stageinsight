@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
-import type { InsightBoard, InsightItem, InsightMemo } from '../types';
+import { aiLessonIdeas } from '../services/ai';
+import type { InsightBoard, InsightItem, InsightMemo, LessonPlan } from '../types';
 import styles from './InsightPage.module.css';
 
 interface InsightPageProps {
@@ -255,6 +256,133 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
 }
 
 // ---------- 메인 컴포넌트 ----------
+// ---------- AI 수업 아이디어: 텍스트 변환 (메모 저장/복사용) ----------
+function lessonPlanToText(plan: LessonPlan, performanceTitle: string): string {
+  const lines: string[] = [];
+  lines.push(`✨ AI 수업 아이디어 — ${performanceTitle}`);
+  if (plan.gradeBand) lines.push(`권장 학년군: ${plan.gradeBand}`);
+  lines.push('');
+  if (plan.overview) { lines.push(`[개요] ${plan.overview}`); lines.push(''); }
+  if (plan.objectives?.length) {
+    lines.push('[학습 목표]');
+    plan.objectives.forEach(o => lines.push(`· ${o}`));
+    lines.push('');
+  }
+  if (plan.activities?.length) {
+    lines.push('[수업 활동]');
+    plan.activities.forEach((a, i) => {
+      lines.push(`${i + 1}. ${a.title}${a.duration ? ` (${a.duration})` : ''}`);
+      lines.push(`   ${a.description}`);
+    });
+    lines.push('');
+  }
+  if (plan.discussionQuestions?.length) {
+    lines.push('[발문/토의 질문]');
+    plan.discussionQuestions.forEach(q => lines.push(`· ${q}`));
+    lines.push('');
+  }
+  if (plan.assessment) { lines.push(`[평가] ${plan.assessment}`); }
+  return lines.join('\n').trim();
+}
+
+// ---------- AI 수업 아이디어 모달 ----------
+function LessonPlanModal({
+  performanceTitle, plan, loading, error, onClose, onSaveMemo,
+}: {
+  performanceTitle: string;
+  plan: LessonPlan | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSaveMemo: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="card"
+        style={{ maxWidth: '640px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: '24px' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, fontSize: '17px' }}>✨ AI 수업 아이디어<br /><small style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{performanceTitle}</small></h3>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }}>×</button>
+        </div>
+
+        {loading && (
+          <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            AI가 수업 아이디어를 구성하고 있어요… ⏳
+          </p>
+        )}
+        {error && (
+          <p style={{ padding: '16px', color: 'var(--color-accent-primary)', fontSize: '14px' }}>
+            {error}
+          </p>
+        )}
+
+        {plan && !loading && (
+          <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
+            {plan.gradeBand && (
+              <span className="tag" style={{ marginBottom: 8, display: 'inline-block' }}>권장 학년군: {plan.gradeBand}</span>
+            )}
+            {plan.overview && <p style={{ marginTop: 4 }}>{plan.overview}</p>}
+
+            {plan.objectives?.length > 0 && (
+              <>
+                <h4 style={{ margin: '16px 0 6px' }}>🎯 학습 목표</h4>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {plan.objectives.map((o, i) => <li key={i}>{o}</li>)}
+                </ul>
+              </>
+            )}
+
+            {plan.activities?.length > 0 && (
+              <>
+                <h4 style={{ margin: '16px 0 6px' }}>🧩 수업 활동</h4>
+                {plan.activities.map((a, i) => (
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <strong>{i + 1}. {a.title}</strong>
+                    {a.duration && <span className="tag" style={{ marginLeft: 6, fontSize: 11 }}>{a.duration}</span>}
+                    <p style={{ margin: '2px 0 0' }}>{a.description}</p>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {plan.discussionQuestions?.length > 0 && (
+              <>
+                <h4 style={{ margin: '16px 0 6px' }}>💬 발문 · 토의 질문</h4>
+                <ul style={{ margin: 0, paddingLeft: 20 }}>
+                  {plan.discussionQuestions.map((q, i) => <li key={i}>{q}</li>)}
+                </ul>
+              </>
+            )}
+
+            {plan.assessment && (
+              <>
+                <h4 style={{ margin: '16px 0 6px' }}>📊 평가</h4>
+                <p style={{ margin: 0 }}>{plan.assessment}</p>
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button className="btn btn-primary" onClick={onSaveMemo}>📝 메모로 저장</button>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
+              AI 생성 결과는 참고용입니다. 수업 적용 전 내용을 검토해 주세요.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function InsightPage({ onBack }: InsightPageProps) {
   const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo, clearInsightBoard, reorderInsightItems } = useApp();
   const { insightBoard } = state;
@@ -268,6 +396,62 @@ export function InsightPage({ onBack }: InsightPageProps) {
   const [selectedItem, setSelectedItem] = useState<InsightItem | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── AI 수업 아이디어 ──
+  const [lessonOpen, setLessonOpen] = useState(false);
+  const [lessonTitle, setLessonTitle] = useState('');
+  const [lessonPerfId, setLessonPerfId] = useState<string | null>(null);
+  const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
+  const [lessonLoading, setLessonLoading] = useState(false);
+  const [lessonError, setLessonError] = useState<string | null>(null);
+
+  const handleGenerateLesson = useCallback(async (group: PerformanceGroup) => {
+    const title = group.performanceTitle ?? '공연 미지정';
+    setLessonOpen(true);
+    setLessonTitle(title);
+    setLessonPerfId(group.performanceId);
+    setLessonPlan(null);
+    setLessonError(null);
+    setLessonLoading(true);
+
+    const standards = group.items
+      .filter(i => i.type === 'standard')
+      .map(i => {
+        const [subject, grade] = (i.subtitle ?? '').split(' · ');
+        return { id: i.title, grade: (grade ?? '').trim(), subject: (subject ?? '').trim(), content: i.detail ?? '' };
+      });
+    const extras = group.items
+      .filter(i => i.type !== 'standard')
+      .map(i => ({ type: i.type, title: i.title }));
+
+    try {
+      const plan = await aiLessonIdeas({
+        performanceTitle: title,
+        standards,
+        extras,
+        cacheKey: `${group.performanceId ?? 'none'}:${standards.map(s => s.id).join(',')}:${extras.length}`,
+      });
+      setLessonPlan(plan);
+    } catch (err) {
+      setLessonError(
+        err instanceof Error
+          ? `수업 아이디어 생성에 실패했습니다. (${err.message})`
+          : '수업 아이디어 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setLessonLoading(false);
+    }
+  }, []);
+
+  const handleSaveLessonMemo = useCallback(() => {
+    if (!lessonPlan) return;
+    addInsightMemo(
+      lessonPlanToText(lessonPlan, lessonTitle),
+      lessonPerfId ?? undefined,
+      lessonPerfId ? lessonTitle : undefined,
+    );
+    setLessonOpen(false);
+  }, [lessonPlan, lessonTitle, lessonPerfId, addInsightMemo]);
 
   // ── 드래그 앤 드롭 ──
   const dragId = useRef<string | null>(null);
@@ -456,6 +640,16 @@ export function InsightPage({ onBack }: InsightPageProps) {
                     <span className="tag" style={{ fontSize: '11px' }}>
                       {group.items.length + group.memos.length}개
                     </span>
+                    {group.items.some(i => i.type === 'standard') && (
+                      <button
+                        className="btn btn-outline"
+                        style={{ marginLeft: 'auto', fontSize: '12px', padding: '4px 10px' }}
+                        title="담긴 성취기준·자료로 AI 수업 아이디어를 생성합니다."
+                        onClick={() => handleGenerateLesson(group)}
+                      >
+                        ✨ AI 수업 아이디어
+                      </button>
+                    )}
                   </div>
 
                   {/* 아이템 그리드 */}
@@ -612,6 +806,17 @@ export function InsightPage({ onBack }: InsightPageProps) {
 
       {selectedItem && (
         <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
+
+      {lessonOpen && (
+        <LessonPlanModal
+          performanceTitle={lessonTitle}
+          plan={lessonPlan}
+          loading={lessonLoading}
+          error={lessonError}
+          onClose={() => setLessonOpen(false)}
+          onSaveMemo={handleSaveLessonMemo}
+        />
       )}
     </div>
   );
