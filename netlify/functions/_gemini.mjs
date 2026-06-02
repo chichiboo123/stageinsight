@@ -34,6 +34,14 @@ export const MODEL_CHAIN = [
 // 하위 호환용 기본 모델 (체인의 1순위)
 export const DEFAULT_MODEL = MODEL_CHAIN[0];
 
+/**
+ * Google 검색 그라운딩 도구.
+ * 이 도구를 켜면 모델이 실제 웹(위키백과·나무위키·예매처 등)을 검색해
+ * 사실에 근거한 답을 생성한다 → 동명이작 혼동·환각을 크게 줄인다.
+ * ⚠ Gemini 2.5에서는 responseSchema(구조화 출력)와 동시 사용할 수 없다.
+ */
+export const SEARCH_TOOL = [{ google_search: {} }];
+
 export class GeminiError extends Error {
   constructor(message, status = 500) {
     super(message);
@@ -80,18 +88,24 @@ function thinkingConfigFor(model, budget = 0) {
  * 단일 모델로 generateContent를 1회 호출한다 (내부 함수).
  * 성공 시 파싱된 JSON 객체를 반환하고, 실패 시 GeminiError를 throw 한다.
  */
-async function callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget = 0 }) {
+async function callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget = 0, tools = null }) {
+  const grounded = Array.isArray(tools) && tools.length > 0;
   const body = {
     contents: [{ role: 'user', parts: [{ text: user }] }],
     generationConfig: {
-      responseMimeType: 'application/json',
       temperature,
       maxOutputTokens,
       // ★ 사고 토큰이 출력 예산을 잠식해 JSON이 잘리는 문제(502) 예방
       thinkingConfig: thinkingConfigFor(model, thinkingBudget),
-      ...(schema ? { responseSchema: schema } : {}),
+      // ⚠ google_search 그라운딩과 responseSchema(구조화 출력)는 Gemini 2.5에서
+      //   동시 사용 불가 → 그라운딩 시에는 스키마/JSON MIME을 빼고 프롬프트로 JSON을 유도한다.
+      ...(grounded ? {} : {
+        responseMimeType: 'application/json',
+        ...(schema ? { responseSchema: schema } : {}),
+      }),
     },
   };
+  if (grounded) body.tools = tools;
   if (system) body.systemInstruction = { parts: [{ text: system }] };
 
   let res;
@@ -159,6 +173,7 @@ export async function callGeminiJSON({
   temperature = 0.3,
   maxOutputTokens = 1024,
   thinkingBudget = 0,
+  tools = null,
 }) {
   if (!apiKey) {
     throw new GeminiError('GEMINI_API_KEY가 설정되지 않았습니다.', 503);
@@ -169,7 +184,7 @@ export async function callGeminiJSON({
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     try {
-      const json = await callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget });
+      const json = await callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget, tools });
       // 폴백이 발생했다면(첫 모델이 아니면) 로그로 남겨 추적 가능하게 한다.
       if (i > 0) {
         console.info(`[Gemini] 폴백 성공: '${model}' 사용 (우선순위 ${i + 1}위)`);

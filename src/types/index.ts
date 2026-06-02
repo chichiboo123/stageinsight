@@ -116,6 +116,8 @@ export interface PerformanceIntro {
   watchPoints: string[];
   educationalValue?: string;
   discussionStarters: string[];
+  verified?: boolean;      // 웹 검색으로 작품을 특정·확인했는지
+  sourceNote?: string;     // 참고한 출처/근거 요약
   _model?: string | null;
 }
 

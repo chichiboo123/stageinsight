@@ -559,8 +559,15 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                               </ul>
                             </>
                           )}
-                          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 10 }}>
-                            AI 생성 결과는 참고용이며 부정확할 수 있습니다.
+                          {intro.sourceNote && (
+                            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 10 }}>
+                              🔎 참고: {intro.sourceNote}
+                            </p>
+                          )}
+                          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
+                            {intro.verified === false
+                              ? '⚠️ 웹 검색으로 작품을 정확히 특정하지 못했습니다. 동명의 다른 작품일 수 있으니 반드시 확인해 주세요.'
+                              : 'Google 검색을 참고해 생성한 결과이며, 참고용으로 활용해 주세요.'}
                           </p>
                         </div>
                       )}
