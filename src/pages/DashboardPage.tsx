@@ -2,8 +2,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { usePerformances, usePerformanceDetail } from '../hooks/usePerformances';
-import { useCurriculumMatch } from '../hooks/useCurriculumMatch';
-import { useMediaRecommendations } from '../hooks/useMediaRecommendations';
+import { useDashboardCuration } from '../hooks/useDashboardCuration';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { PosterModal } from '../components/common/PosterModal';
@@ -416,9 +415,10 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const displayPerformance = detailedPerformance ?? selectedPerformance;
 
   const {
-    matches, loading: currLoading, activeFilters, setFilters,
-    runAICuration, aiLoading: currAiLoading, aiCurated, aiError: currAiError,
-  } = useCurriculumMatch(displayPerformance);
+    matches, currLoading, activeFilters, setFilters,
+    movies, books, moviesLoading, booksLoading, moviesError, booksError,
+    runCuration, aiLoading, curated, aiError, themes, sourceWork, canCurate,
+  } = useDashboardCuration(displayPerformance);
 
   const handleShowWiki = useCallback(async () => {
     if (!displayPerformance) return;
@@ -465,12 +465,6 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
     const subjectOk = subjectFilter.length === 0 || subjectFilter.includes(m.standard.subject);
     return gradeOk && subjectOk;
   }), [matches, gradeFilter, subjectFilter]);
-
-  const {
-    movies, books, moviesLoading, booksLoading, moviesError, booksError,
-    curate: curateMedia, curating: mediaCurating, curated: mediaCurated,
-    curateError: mediaCurateError, canCurate: canCurateMedia, aiThemes: mediaThemes,
-  } = useMediaRecommendations(displayPerformance);
 
   const handlePosterClick = useCallback((src: string) => {
     setPosterModalSrc(src);
@@ -782,12 +776,47 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 </div>
               </section>
 
+              {/* 통합 AI 큐레이션 — 성취기준·영화·도서를 한 번에 */}
+              <section className={`card ${styles.curationPanel}`}>
+                <div className={styles.curationHead}>
+                  <div>
+                    <strong className={styles.curationTitle}>✨ AI 큐레이션</strong>
+                    <p className={styles.curationDesc}>
+                      작품의 원작·주제를 웹에서 찾아 <b>성취기준 · 영화 · 도서</b>를 한 번에 큐레이션합니다.
+                    </p>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ whiteSpace: 'nowrap' }}
+                    onClick={runCuration}
+                    disabled={!canCurate || aiLoading || curated}
+                    title="작품 원작/배경을 웹 검색으로 특정한 뒤, 성취기준·영화·도서를 한 번의 호출로 선별·랭킹합니다."
+                  >
+                    {aiLoading ? '✨ 큐레이션 중…' : curated ? '✓ 큐레이션 완료' : '✨ AI 큐레이션 실행'}
+                  </button>
+                </div>
+                {/* 웹 검색으로 특정한 원작/배경 */}
+                {curated && sourceWork && (
+                  <p className={styles.curationSource}>🔎 원작·배경: <b>{sourceWork}</b></p>
+                )}
+                {/* AI가 파악한 작품 핵심 주제 */}
+                {curated && themes.length > 0 && (
+                  <div className={styles.curationThemes}>
+                    <span className={styles.curationThemesLabel}>🎯 작품 주제</span>
+                    {themes.map(t => <span key={t} className="tag" style={{ fontSize: 11 }}>{t}</span>)}
+                  </div>
+                )}
+                {aiError && (
+                  <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 8 }}>{aiError}</p>
+                )}
+              </section>
+
               {/* 교육과정 성취기준 */}
               <section className={styles.section}>
                 <div className={styles.sectionHeader}>
                   <h3 className="section-title">
                     교육과정 성취기준
-                    {aiCurated && (
+                    {curated && (
                       <span
                         title="AI가 의미 기반으로 큐레이션한 결과입니다."
                         style={{
@@ -802,26 +831,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {matches.length > 0 && (
                       <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {currAiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
+                        {aiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
                       </span>
-                    )}
-                    {matches.length > 0 && !aiCurated && (
-                      <button
-                        className="btn btn-outline"
-                        style={{ fontSize: 12, padding: '4px 10px', whiteSpace: 'nowrap' }}
-                        onClick={runAICuration}
-                        disabled={currAiLoading}
-                        title="키워드 결과를 AI가 의미 기반으로 재정렬하고 연계 근거를 제시합니다."
-                      >
-                        {currAiLoading ? '✨ 큐레이션 중…' : '✨ AI 큐레이션'}
-                      </button>
                     )}
                   </div>
                 </div>
-
-                {currAiError && (
-                  <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: '0 0 8px' }}>{currAiError}</p>
-                )}
 
                 {/* 과정 필터 */}
                 <div className={styles.filterGroup}>
@@ -961,48 +975,16 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 </div>
               </section>
 
-              {/* 영화·도서 AI 큐레이션 컨트롤 (버튼 트리거) */}
-              <section className={styles.section}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <button
-                    className="btn btn-primary"
-                    style={{ fontSize: 13 }}
-                    onClick={curateMedia}
-                    disabled={!canCurateMedia || mediaCurating || mediaCurated}
-                    title="공연과 연관성 높은 영화·도서만 AI가 선별·랭킹하고, 정밀 검색으로 보강합니다."
-                  >
-                    {mediaCurating ? '✨ 추천 큐레이션 중…' : mediaCurated ? '✨ AI 큐레이션 완료' : '✨ AI로 추천 정확도 높이기'}
-                  </button>
-                  {mediaCurated && (
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                      작품 내용·주제를 분석해 큐레이션한 결과입니다.
-                    </span>
-                  )}
-                </div>
-                {/* AI가 파악한 작품 핵심 주제 (내용 기반 큐레이션 근거) */}
-                {mediaCurated && mediaThemes.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>🎯 작품 주제:</span>
-                    {mediaThemes.map(t => (
-                      <span key={t} className="tag" style={{ fontSize: 11 }}>{t}</span>
-                    ))}
-                  </div>
-                )}
-                {mediaCurateError && (
-                  <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 6 }}>{mediaCurateError}</p>
-                )}
-              </section>
-
               {/* 연계 영화 */}
               <section className={styles.section}>
-                <h3 className="section-title">연계 추천 영화{mediaCurated && ' ✨'}</h3>
+                <h3 className="section-title">연계 추천 영화{curated && ' ✨'}</h3>
                 {moviesLoading && <LoadingSpinner size="sm" />}
                 {moviesError && <ErrorMessage message={moviesError} />}
                 {!moviesLoading && !moviesError && movies.length === 0 && (
                   <p className={styles.emptyText}>
-                    {mediaCurated
+                    {curated
                       ? 'AI가 연계 영화를 찾지 못했습니다.'
-                      : '기본 검색 결과가 없어요. 위 “✨ AI로 추천 정확도 높이기”를 눌러보세요.'}
+                      : '기본 검색 결과가 없어요. 위 “✨ AI 큐레이션”을 눌러보세요.'}
                   </p>
                 )}
                 {!moviesLoading && movies.length > 0 && (
@@ -1074,14 +1056,14 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
 
               {/* 연계 도서 */}
               <section className={styles.section}>
-                <h3 className="section-title">연계 추천 도서{mediaCurated && ' ✨'}</h3>
+                <h3 className="section-title">연계 추천 도서{curated && ' ✨'}</h3>
                 {booksLoading && <LoadingSpinner size="sm" />}
                 {booksError && <ErrorMessage message={booksError} />}
                 {!booksLoading && !booksError && books.length === 0 && (
                   <p className={styles.emptyText}>
-                    {mediaCurated
+                    {curated
                       ? 'AI가 연계 도서를 찾지 못했습니다.'
-                      : '기본 검색 결과가 없어요. 위 “✨ AI로 추천 정확도 높이기”를 눌러보세요.'}
+                      : '기본 검색 결과가 없어요. 위 “✨ AI 큐레이션”을 눌러보세요.'}
                   </p>
                 )}
                 {!booksLoading && books.length > 0 && (

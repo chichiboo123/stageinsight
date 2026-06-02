@@ -131,6 +131,19 @@ export interface MediaCuration {
   _model?: string | null;
 }
 
+// ---------- 통합 AI 큐레이션 (성취기준 + 영화 + 도서를 한 번에) ----------
+export interface UnifiedCuration {
+  sourceWork?: string;         // 웹검색으로 특정한 원작/배경 (예: "오즈의 마법사")
+  themes: string[];            // 작품 핵심 주제
+  curriculumSelections: Array<{ id: string; reason: string; relevance: number }>;
+  movieSelections: Array<{ id: string; reason: string }>;
+  bookSelections: Array<{ isbn: string; reason: string }>;
+  movieQueries: string[];      // 원작·주제 기반 정밀 영화 검색어(보강)
+  bookQueries: string[];       // 원작·주제 기반 정밀 도서 검색어(보강)
+  verified?: boolean;          // 웹검색으로 작품을 특정·확인했는지
+  _model?: string | null;
+}
+
 // ---------- 영화 (TMDB) ----------
 export interface Movie {
   id: number;

@@ -391,10 +391,110 @@ export async function curateMedia(body, apiKey) {
   };
 }
 
+/* ============================================================
+   5) 통합 큐레이션 (성취기준 + 영화 + 도서를 한 번의 호출로)
+   - 웹 검색 그라운딩으로 작품의 원작/배경을 먼저 특정(예: 오즈→오즈의 마법사)
+   - 그 이해를 바탕으로 성취기준·영화·도서 후보를 동시에 선별·랭킹
+   - 후보에 없는 원작·핵심 연관작은 정밀 검색어(movieQueries/bookQueries)로 보강
+   - 그라운딩 사용 → responseSchema 불가 → 프롬프트로 JSON 유도 + 방어적 파싱
+   ============================================================ */
+export async function curateAll(body, apiKey) {
+  const performance = body?.performance ?? {};
+  const title = String(performance.title ?? '').slice(0, 120);
+  const genre = String(performance.genre ?? '').slice(0, 20);
+  const synopsis = String(performance.synopsis ?? '').slice(0, 700);
+  const rating = String(performance.rating ?? '').slice(0, 30);
+  const venue = String(performance.venue ?? '').slice(0, 80);
+  const period = String(performance.period ?? '').slice(0, 60);
+  const keywords = (Array.isArray(performance.keywords) ? performance.keywords : [])
+    .slice(0, 12).map(k => String(k).slice(0, 20));
+
+  const curriculum = (Array.isArray(body?.curriculum) ? body.curriculum : []).slice(0, 40).map(c => ({
+    id: String(c.id),
+    g: String(c.grade ?? '').slice(0, 20),
+    s: String(c.subject ?? '').slice(0, 12),
+    t: String(c.content ?? '').slice(0, 80),
+  }));
+  const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 24).map(m => ({
+    id: String(m.id),
+    t: String(m.title ?? '').slice(0, 60),
+    o: String(m.overview ?? '').slice(0, 140),
+  }));
+  const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 24).map(b => ({
+    isbn: String(b.isbn),
+    t: String(b.title ?? '').slice(0, 60),
+    o: String(b.description ?? '').slice(0, 140),
+  }));
+
+  const system =
+    '너는 한국 교사를 돕는 "공연 연계 수업 큐레이터"다. 아래 절차를 따라 한 번에 큐레이션한다.\n\n' +
+    '[1단계 — 작품 특정] 반드시 Google 검색으로 "이 공연"을 먼저 특정한다. 작품명과 공연장·공연기간을 ' +
+    '조합해 검색하고(동명이작 혼동 금지), 원작·원전(소설·동화·영화·설화 등)이 있으면 그 정체를 정확히 파악한다. ' +
+    '예: 뮤지컬 "오즈"는 라이먼 프랭크 바움의 동화 "오즈의 마법사"를 모티브로 한다. ' +
+    '특정한 원작/배경은 sourceWork에 적는다(없거나 불확실하면 빈 문자열).\n\n' +
+    '[2단계 — 주제 파악] 줄거리·원작·장르·키워드를 근거로 작품의 핵심 주제·정서·소재를 themes에 3~6개의 ' +
+    '짧은 구로 적는다. (제목 표면 단어가 아니라 작품의 "내용"을 이해한다.)\n\n' +
+    '[3단계 — 성취기준] 성취기준 후보 목록에서 작품 주제와 의미적으로 연결되는 것을 선별·랭킹한다. ' +
+    '단순 단어 일치가 아니라 주제·정서·가치의 연관으로 판단하고, 특정 학년군에 치우치지 않게 다양하게 고른다. ' +
+    '각 항목은 {id, reason(40자 이내 한국어), relevance(1~5 정수)}. 반드시 후보에 있는 id만 사용한다.\n\n' +
+    '[4단계 — 영화·도서] 영화/도서 후보에서 작품 "내용"과 교육적으로 연결되는 것만 골라 {id|isbn, reason(40자 이내)}로 ' +
+    '랭킹한다. 단순 제목 겹침·무관·학생 부적합 후보는 제외한다.\n\n' +
+    '[5단계 — 보강 검색어] 후보 목록에 원작이나 핵심 연관작이 없을 수 있다. 한국 도서관·극장에서 찾을 수 있도록 ' +
+    'movieQueries·bookQueries를 각각 반드시 4~6개씩 제안한다(절대 빈 배열 금지). ' +
+    '★중요: 원작/원전이 있으면 그 제목을 반드시 첫 번째 검색어로 넣는다(예: "오즈의 마법사"). ' +
+    '나머지는 작품의 주제·소재를 드러내는 구체적 2~5어절 구로 쓰고("우정으로 성장하는 아이들" 등), ' +
+    '너무 일반적인 한 단어(음악, 이야기, 사랑 등)는 피한다. 도서 검색어는 그림책·동화·청소년 도서 등 학생 눈높이를 고려한다.\n\n' +
+    '다른 설명·마크다운·코드펜스 없이 아래 JSON 객체 "하나만" 출력한다:\n' +
+    '{"sourceWork":"원작/배경 또는 빈 문자열","themes":["..."],' +
+    '"curriculum":[{"id":"...","reason":"...","relevance":4}],' +
+    '"movies":[{"id":"...","reason":"..."}],"books":[{"isbn":"...","reason":"..."}],' +
+    '"movieQueries":["..."],"bookQueries":["..."],"verified":true}';
+
+  const user = JSON.stringify({
+    이공연: { 제목: title, 장르: genre, 관람연령: rating, 공연장: venue, 공연기간: period, 줄거리: synopsis, 키워드: keywords },
+    성취기준후보: curriculum,
+    영화후보: movies,
+    도서후보: books,
+  });
+
+  // 그라운딩 시 responseSchema 사용 불가 → 프롬프트로 JSON 유도 + 폴백 파서로 추출
+  const { json, model } = await callGeminiJSON({
+    apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.3, maxOutputTokens: 2800,
+  });
+
+  const validCur = new Set(curriculum.map(c => c.id));
+  const validMovie = new Set(movies.map(m => m.id));
+  const validBook = new Set(books.map(b => b.isbn));
+  const arr = (a, n) => [...new Set((a ?? []).map(s => String(s).trim()).filter(Boolean))].slice(0, n);
+  const clampRel = v => Math.min(5, Math.max(1, Math.round(Number(v) || 3)));
+
+  return {
+    sourceWork: json?.sourceWork ? String(json.sourceWork).slice(0, 120) : '',
+    themes: arr(json?.themes, 6),
+    curriculumSelections: (json?.curriculum ?? [])
+      .filter(s => s && validCur.has(String(s.id)))
+      .slice(0, 14)
+      .map(s => ({ id: String(s.id), reason: String(s.reason ?? '').slice(0, 60), relevance: clampRel(s.relevance) })),
+    movieSelections: (json?.movies ?? [])
+      .filter(s => s && validMovie.has(String(s.id)))
+      .slice(0, 12)
+      .map(s => ({ id: String(s.id), reason: String(s.reason ?? '').slice(0, 60) })),
+    bookSelections: (json?.books ?? [])
+      .filter(s => s && validBook.has(String(s.isbn)))
+      .slice(0, 12)
+      .map(s => ({ isbn: String(s.isbn), reason: String(s.reason ?? '').slice(0, 60) })),
+    movieQueries: arr(json?.movieQueries, 6),
+    bookQueries: arr(json?.bookQueries, 6),
+    verified: typeof json?.verified === 'boolean' ? json.verified : undefined,
+    _model: model,
+  };
+}
+
 /* 라우팅 테이블 (이름 → 핸들러) */
 export const HANDLERS = {
   'curriculum-rerank': rerankCurriculum,
   'lesson-ideas': lessonIdeas,
   'introduce-performance': introducePerformance,
   'curate-media': curateMedia,
+  'curate-all': curateAll,
 };

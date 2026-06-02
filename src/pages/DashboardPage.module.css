@@ -211,6 +211,46 @@
   gap: var(--space-4);
 }
 
+/* 통합 AI 큐레이션 패널 */
+.curationPanel {
+  padding: var(--space-4) var(--space-5);
+  background: linear-gradient(180deg, rgba(107,138,253,0.08), rgba(107,138,253,0.03));
+  border: 1px solid var(--color-accent-light, rgba(107,138,253,0.25));
+}
+.curationHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.curationTitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+}
+.curationDesc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.curationSource {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-3);
+}
+.curationThemes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: var(--space-2);
+}
+.curationThemesLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
 .sectionHeader {
   display: flex;
   align-items: center;
