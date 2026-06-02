@@ -168,7 +168,8 @@ export function useMediaRecommendations(performance: Performance | null): MediaR
     curating,
     curated,
     curateError,
-    canCurate: !state.moviesLoading && !state.booksLoading
-      && (state.baseMovies.length > 0 || state.baseBooks.length > 0),
+    // 기본 추천이 0개여도(=관련 작품이 안 잡힌 공연) AI 큐레이션은 가능해야 한다.
+    // → 정밀 검색어 보강으로 의미 있는 결과를 새로 찾아낸다.
+    canCurate: performance !== null && !state.moviesLoading && !state.booksLoading,
   };
 }

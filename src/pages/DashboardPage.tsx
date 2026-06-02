@@ -837,7 +837,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 {moviesLoading && <LoadingSpinner size="sm" />}
                 {moviesError && <ErrorMessage message={moviesError} />}
                 {!moviesLoading && !moviesError && movies.length === 0 && (
-                  <p className={styles.emptyText}>매칭된 영화가 없습니다.</p>
+                  <p className={styles.emptyText}>
+                    {mediaCurated
+                      ? 'AI가 연계 영화를 찾지 못했습니다.'
+                      : '기본 검색 결과가 없어요. 위 “✨ AI로 추천 정확도 높이기”를 눌러보세요.'}
+                  </p>
                 )}
                 {!moviesLoading && movies.length > 0 && (
                   <div className={styles.mediaGrid}>
@@ -908,7 +912,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 {booksLoading && <LoadingSpinner size="sm" />}
                 {booksError && <ErrorMessage message={booksError} />}
                 {!booksLoading && !booksError && books.length === 0 && (
-                  <p className={styles.emptyText}>매칭된 도서가 없습니다.</p>
+                  <p className={styles.emptyText}>
+                    {mediaCurated
+                      ? 'AI가 연계 도서를 찾지 못했습니다.'
+                      : '기본 검색 결과가 없어요. 위 “✨ AI로 추천 정확도 높이기”를 눌러보세요.'}
+                  </p>
                 )}
                 {!booksLoading && books.length > 0 && (
                   <div className={styles.mediaGrid}>

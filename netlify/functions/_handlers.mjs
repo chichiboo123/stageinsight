@@ -9,7 +9,7 @@
  * - 실패 시 throw → 호출 측(함수/미들웨어)이 적절한 상태코드로 응답.
  */
 
-import { callGeminiJSON } from './gemini.mjs';
+import { callGeminiJSON } from './_gemini.mjs';
 
 const T = { STRING: 'STRING', ARRAY: 'ARRAY', OBJECT: 'OBJECT', INTEGER: 'INTEGER' };
 
@@ -237,13 +237,17 @@ export async function curateMedia(body, apiKey) {
 
   const system =
     '너는 공연 연계 수업 자료를 큐레이션하는 사서·영화 교사다. ' +
-    '주어진 "공연"과 교육적으로 연관성이 높은 영화·도서만 후보 목록에서 골라 랭킹한다. ' +
+    '주어진 "공연"과 교육적으로 연관성이 높은 영화·도서를 후보 목록에서 골라 랭킹한다. ' +
     '연관성은 주제·정서·소재의 일치를 기준으로 하며, 단순히 제목 단어가 겹치는 것은 배제한다. ' +
     '학생에게 부적합하거나 무관한 후보는 제외한다. 근거(reason)는 공연과의 연결점을 ' +
     '한국어 한 문장(40자 이내)으로 쓴다. 반드시 후보의 id/isbn만 사용한다. ' +
-    '또한 후보가 빈약할 때를 대비해, 이 공연에 더 적합한 작품을 찾기 위한 ' +
-    '정밀 검색어(movieQueries/bookQueries)를 한국어로 2~4개씩 제안한다. ' +
-    '검색어는 너무 일반적인 단어(음악, 이야기 등)를 피하고 주제를 잘 드러내는 2~4어절 구로 쓴다.';
+    '★중요: 어떤 공연이든 주제·소재 면에서 연결되는 영화·도서는 반드시 존재한다. ' +
+    '후보가 비어 있거나 빈약하더라도, 이 공연의 주제·정서·소재·대상연령에 맞는 ' +
+    '작품을 한국 도서관·극장에서 찾을 수 있도록 movieQueries와 bookQueries를 ' +
+    '"각각 반드시 3~4개씩" 제안한다(절대 빈 배열 금지). ' +
+    '검색어는 너무 일반적인 한 단어(음악, 이야기, 사랑 등)를 피하고, ' +
+    '주제를 드러내는 구체적 2~4어절 구(예: "우정과 성장 동화", "환경을 지키는 모험")로 쓴다. ' +
+    '도서 검색어는 그림책·동화·청소년 도서 등 학생 눈높이를 고려한다.';
 
   const user = JSON.stringify({
     공연: {
@@ -277,7 +281,7 @@ export async function curateMedia(body, apiKey) {
       movieQueries: { type: T.ARRAY, items: { type: T.STRING } },
       bookQueries: { type: T.ARRAY, items: { type: T.STRING } },
     },
-    required: ['movieSelections', 'bookSelections'],
+    required: ['movieSelections', 'bookSelections', 'movieQueries', 'bookQueries'],
   };
 
   const { json, model } = await callGeminiJSON({
