@@ -37,12 +37,14 @@
 - `useNearbyVenues.ts`: 주변 공연장 조회.
 - `useKakaoMap.ts`: 카카오맵 로딩/마커/이동 제어.
 - `usePerformances.ts`: 공연 목록/상세 조회.
-- `useCurriculumMatch.ts`: 성취기준 매칭.
-- `useMediaRecommendations.ts`: 영화/도서 추천 병렬 조회.
+- `useDashboardCuration.ts`: 성취기준 매칭 + 영화/도서 추천(기본) + **통합 AI 큐레이션**을 한 곳에서 관리.
 
 ### `src/services/` (외부 API 연동)
 - `kakao.ts`, `kopis.ts`, `tmdb.ts`, `naverBook.ts`: 각 외부 API 래퍼.
 - `curriculumMatcher.ts`: 성취기준 매칭 유틸/정규화 로직.
+- `ai.ts`: 서버리스 AI 게이트웨이(`/api/ai/*`) 클라이언트 + 결과 캐싱.
+- `shareCodec.ts`: 인사이트 바구니 공유 링크 인코딩(단축/gzip 압축/base64).
+- `wiki.ts`: 위키백과 요약 + 작품명 정규화(`cleanWorkTitle`).
 
 ### `src/types/` / `src/data/` / `src/assets/`
 - `types/`: 도메인 타입 정의.

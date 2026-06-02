@@ -2,8 +2,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { usePerformances, usePerformanceDetail } from '../hooks/usePerformances';
-import { useCurriculumMatch } from '../hooks/useCurriculumMatch';
-import { useMediaRecommendations } from '../hooks/useMediaRecommendations';
+import { useDashboardCuration } from '../hooks/useDashboardCuration';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { PosterModal } from '../components/common/PosterModal';
@@ -127,12 +126,15 @@ function ImageModal({ images, title, onClose }: { images: string[]; title: strin
           overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${title} 공연소개 이미지`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
             공연소개 이미지 — {title}
           </h3>
-          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }}>×</button>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }} aria-label="닫기">×</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {images.map((src, i) => (
@@ -256,6 +258,9 @@ function MovieDetailModal({ movie, onClose }: { movie: Movie; onClose: () => voi
           overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${movie.title} 영화 정보`}
       >
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
           {movie.posterPath ? (
@@ -271,7 +276,7 @@ function MovieDetailModal({ movie, onClose }: { movie: Movie; onClose: () => voi
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
                 {movie.title}
               </h3>
-              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }}>×</button>
+              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }} aria-label="닫기">×</button>
             </div>
             {movie.originalTitle && movie.originalTitle !== movie.title && (
               <small style={{ color: 'var(--color-text-muted)' }}>{movie.originalTitle}</small>
@@ -327,6 +332,9 @@ function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void })
           overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${book.title} 도서 정보`}
       >
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
           {book.image ? (
@@ -342,7 +350,7 @@ function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void })
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
                 {book.title}
               </h3>
-              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }}>×</button>
+              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }} aria-label="닫기">×</button>
             </div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{book.author}</p>
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{book.publisher}</p>
@@ -416,9 +424,10 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const displayPerformance = detailedPerformance ?? selectedPerformance;
 
   const {
-    matches, loading: currLoading, activeFilters, setFilters,
-    runAICuration, aiLoading: currAiLoading, aiCurated, aiError: currAiError,
-  } = useCurriculumMatch(displayPerformance);
+    matches, currLoading, activeFilters, setFilters,
+    movies, books, moviesLoading, booksLoading, moviesError, booksError,
+    runCuration, aiLoading, curated, aiError, themes, sourceWork, canCurate,
+  } = useDashboardCuration(displayPerformance);
 
   const handleShowWiki = useCallback(async () => {
     if (!displayPerformance) return;
@@ -465,12 +474,6 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
     const subjectOk = subjectFilter.length === 0 || subjectFilter.includes(m.standard.subject);
     return gradeOk && subjectOk;
   }), [matches, gradeFilter, subjectFilter]);
-
-  const {
-    movies, books, moviesLoading, booksLoading, moviesError, booksError,
-    curate: curateMedia, curating: mediaCurating, curated: mediaCurated,
-    curateError: mediaCurateError, canCurate: canCurateMedia, aiThemes: mediaThemes,
-  } = useMediaRecommendations(displayPerformance);
 
   const handlePosterClick = useCallback((src: string) => {
     setPosterModalSrc(src);
@@ -749,6 +752,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   <button
                     className={`${styles.bookmarkBtn} ${isSaved('performance', displayPerformance!.id) ? styles.bookmarkSaved : ''}`}
                     title={isSaved('performance', displayPerformance!.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                    aria-label={isSaved('performance', displayPerformance!.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                     aria-pressed={isSaved('performance', displayPerformance!.id)}
                     onClick={() => isSaved('performance', displayPerformance!.id)
                       ? removeInsightItem(displayPerformance!.id)
@@ -775,11 +779,46 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       savedAt: new Date().toISOString(),
                     })}
                   >
-                    <span className="material-symbols-outlined">
+                    <span className="material-symbols-outlined" aria-hidden="true">
                       {isSaved('performance', displayPerformance!.id) ? 'bookmark_added' : 'bookmark_add'}
                     </span>
                   </button>
                 </div>
+              </section>
+
+              {/* 통합 AI 큐레이션 — 성취기준·영화·도서를 한 번에 */}
+              <section className={`card ${styles.curationPanel}`}>
+                <div className={styles.curationHead}>
+                  <div>
+                    <strong className={styles.curationTitle}>✨ AI 큐레이션</strong>
+                    <p className={styles.curationDesc}>
+                      작품의 원작·주제를 웹에서 찾아 <b>성취기준 · 영화 · 도서</b>를 한 번에 큐레이션합니다.
+                    </p>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ whiteSpace: 'nowrap' }}
+                    onClick={runCuration}
+                    disabled={!canCurate || aiLoading || curated}
+                    title="작품 원작/배경을 웹 검색으로 특정한 뒤, 성취기준·영화·도서를 한 번의 호출로 선별·랭킹합니다."
+                  >
+                    {aiLoading ? '✨ 큐레이션 중…' : curated ? '✓ 큐레이션 완료' : '✨ AI 큐레이션 실행'}
+                  </button>
+                </div>
+                {/* 웹 검색으로 특정한 원작/배경 */}
+                {curated && sourceWork && (
+                  <p className={styles.curationSource}>🔎 원작·배경: <b>{sourceWork}</b></p>
+                )}
+                {/* AI가 파악한 작품 핵심 주제 */}
+                {curated && themes.length > 0 && (
+                  <div className={styles.curationThemes}>
+                    <span className={styles.curationThemesLabel}>🎯 작품 주제</span>
+                    {themes.map(t => <span key={t} className="tag" style={{ fontSize: 11 }}>{t}</span>)}
+                  </div>
+                )}
+                {aiError && (
+                  <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 8 }}>{aiError}</p>
+                )}
               </section>
 
               {/* 교육과정 성취기준 */}
@@ -787,7 +826,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 <div className={styles.sectionHeader}>
                   <h3 className="section-title">
                     교육과정 성취기준
-                    {aiCurated && (
+                    {curated && (
                       <span
                         title="AI가 의미 기반으로 큐레이션한 결과입니다."
                         style={{
@@ -802,26 +841,11 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {matches.length > 0 && (
                       <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                        {currAiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
+                        {aiLoading ? 'AI 분석 중…' : `총 ${matches.length}개 · ${availableGrades.length}개 학년군`}
                       </span>
-                    )}
-                    {matches.length > 0 && !aiCurated && (
-                      <button
-                        className="btn btn-outline"
-                        style={{ fontSize: 12, padding: '4px 10px', whiteSpace: 'nowrap' }}
-                        onClick={runAICuration}
-                        disabled={currAiLoading}
-                        title="키워드 결과를 AI가 의미 기반으로 재정렬하고 연계 근거를 제시합니다."
-                      >
-                        {currAiLoading ? '✨ 큐레이션 중…' : '✨ AI 큐레이션'}
-                      </button>
                     )}
                   </div>
                 </div>
-
-                {currAiError && (
-                  <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: '0 0 8px' }}>{currAiError}</p>
-                )}
 
                 {/* 과정 필터 */}
                 <div className={styles.filterGroup}>
@@ -938,6 +962,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       <button
                         className={`${styles.bookmarkBtnSm} ${isSaved('standard', standard.id) ? styles.bookmarkSaved : ''}`}
                         title={isSaved('standard', standard.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                        aria-label={isSaved('standard', standard.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                         aria-pressed={isSaved('standard', standard.id)}
                         onClick={() => isSaved('standard', standard.id)
                           ? removeInsightItem(standard.id)
@@ -952,7 +977,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           savedAt: new Date().toISOString(),
                         })}
                       >
-                        <span className="material-symbols-outlined">
+                        <span className="material-symbols-outlined" aria-hidden="true">
                           {isSaved('standard', standard.id) ? 'bookmark_added' : 'bookmark_add'}
                         </span>
                       </button>
@@ -961,48 +986,16 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 </div>
               </section>
 
-              {/* 영화·도서 AI 큐레이션 컨트롤 (버튼 트리거) */}
-              <section className={styles.section}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <button
-                    className="btn btn-primary"
-                    style={{ fontSize: 13 }}
-                    onClick={curateMedia}
-                    disabled={!canCurateMedia || mediaCurating || mediaCurated}
-                    title="공연과 연관성 높은 영화·도서만 AI가 선별·랭킹하고, 정밀 검색으로 보강합니다."
-                  >
-                    {mediaCurating ? '✨ 추천 큐레이션 중…' : mediaCurated ? '✨ AI 큐레이션 완료' : '✨ AI로 추천 정확도 높이기'}
-                  </button>
-                  {mediaCurated && (
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                      작품 내용·주제를 분석해 큐레이션한 결과입니다.
-                    </span>
-                  )}
-                </div>
-                {/* AI가 파악한 작품 핵심 주제 (내용 기반 큐레이션 근거) */}
-                {mediaCurated && mediaThemes.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 8 }}>
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>🎯 작품 주제:</span>
-                    {mediaThemes.map(t => (
-                      <span key={t} className="tag" style={{ fontSize: 11 }}>{t}</span>
-                    ))}
-                  </div>
-                )}
-                {mediaCurateError && (
-                  <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 6 }}>{mediaCurateError}</p>
-                )}
-              </section>
-
               {/* 연계 영화 */}
               <section className={styles.section}>
-                <h3 className="section-title">연계 추천 영화{mediaCurated && ' ✨'}</h3>
+                <h3 className="section-title">연계 추천 영화{curated && ' ✨'}</h3>
                 {moviesLoading && <LoadingSpinner size="sm" />}
                 {moviesError && <ErrorMessage message={moviesError} />}
                 {!moviesLoading && !moviesError && movies.length === 0 && (
                   <p className={styles.emptyText}>
-                    {mediaCurated
+                    {curated
                       ? 'AI가 연계 영화를 찾지 못했습니다.'
-                      : '기본 검색 결과가 없어요. 위 “✨ AI로 추천 정확도 높이기”를 눌러보세요.'}
+                      : '기본 검색 결과가 없어요. 위 “✨ AI 큐레이션”을 눌러보세요.'}
                   </p>
                 )}
                 {!moviesLoading && movies.length > 0 && (
@@ -1046,6 +1039,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         <button
                           className={`${styles.bookmarkBtnSm} ${isSaved('movie', String(movie.id)) ? styles.bookmarkSaved : ''}`}
                           title={isSaved('movie', String(movie.id)) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                          aria-label={isSaved('movie', String(movie.id)) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                           aria-pressed={isSaved('movie', String(movie.id))}
                           onClick={e => {
                             e.stopPropagation();
@@ -1062,7 +1056,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          <span className="material-symbols-outlined">
+                          <span className="material-symbols-outlined" aria-hidden="true">
                             {isSaved('movie', String(movie.id)) ? 'bookmark_added' : 'bookmark_add'}
                           </span>
                         </button>
@@ -1074,14 +1068,14 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
 
               {/* 연계 도서 */}
               <section className={styles.section}>
-                <h3 className="section-title">연계 추천 도서{mediaCurated && ' ✨'}</h3>
+                <h3 className="section-title">연계 추천 도서{curated && ' ✨'}</h3>
                 {booksLoading && <LoadingSpinner size="sm" />}
                 {booksError && <ErrorMessage message={booksError} />}
                 {!booksLoading && !booksError && books.length === 0 && (
                   <p className={styles.emptyText}>
-                    {mediaCurated
+                    {curated
                       ? 'AI가 연계 도서를 찾지 못했습니다.'
-                      : '기본 검색 결과가 없어요. 위 “✨ AI로 추천 정확도 높이기”를 눌러보세요.'}
+                      : '기본 검색 결과가 없어요. 위 “✨ AI 큐레이션”을 눌러보세요.'}
                   </p>
                 )}
                 {!booksLoading && books.length > 0 && (
@@ -1123,6 +1117,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         <button
                           className={`${styles.bookmarkBtnSm} ${isSaved('book', book.isbn) ? styles.bookmarkSaved : ''}`}
                           title={isSaved('book', book.isbn) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                          aria-label={isSaved('book', book.isbn) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                           aria-pressed={isSaved('book', book.isbn)}
                           onClick={e => {
                             e.stopPropagation();
@@ -1140,7 +1135,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          <span className="material-symbols-outlined">
+                          <span className="material-symbols-outlined" aria-hidden="true">
                             {isSaved('book', book.isbn) ? 'bookmark_added' : 'bookmark_add'}
                           </span>
                         </button>

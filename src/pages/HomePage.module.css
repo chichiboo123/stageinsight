@@ -81,6 +81,13 @@
   color: #fff !important;
   box-shadow: 0 2px 8px rgba(79,70,229,0.3);
 }
+/* 활성 버튼에 마우스를 올려도 강조 배경·흰 글씨를 유지한다.
+   (이 규칙이 없으면 .modeBtn:hover의 밝은 배경 + 활성 버튼의 흰 글씨가
+    겹쳐 '흰 글씨 + 흰 배경'이 되어 텍스트가 보이지 않는다.) */
+.modeBtnActive:hover {
+  background: var(--color-accent-primary);
+  color: #fff !important;
+}
 
 /* 검색 영역 */
 .searchWrapper {

@@ -17,14 +17,16 @@
 .item {
   display: flex;
   align-items: center;
-  flex: 1 1 0;
+  flex: 0 1 auto;           /* 버튼은 자연 너비 — 간격은 연결선이 채운다 */
   min-width: 0;              /* flex 자식 넘침 방지의 핵심 */
 }
+/* 연결선이 있는 2·3단계 셀은 늘어나서 단계 간 간격을 균등 분배 */
+.item:not(:first-child) { flex: 1 1 0; }
 
 /* 단계 사이 연결선 */
 .connector {
-  flex: 1 1 8px;
-  min-width: 8px;
+  flex: 1 1 0;               /* 남는 공간을 균등하게 차지 → 단계 간격 균형 */
+  min-width: 16px;
   height: 2px;
   background: var(--color-border);
   border-radius: var(--radius-full);

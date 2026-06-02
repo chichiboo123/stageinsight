@@ -14,6 +14,7 @@ import type {
   LessonPlan,
   PerformanceIntro,
   MediaCuration,
+  UnifiedCuration,
 } from '../types';
 import { setAIStatus } from './aiStatus';
 import { cleanWorkTitle } from './wiki';
@@ -210,5 +211,49 @@ export async function aiCurateMedia(
     books: books.map(b => ({ isbn: b.isbn, title: b.title, description: b.description })),
   }, signal);
   cacheSet(cacheKey, result);
+  return result;
+}
+
+/* ============================================================
+   5) 통합 AI 큐레이션 (성취기준 + 영화 + 도서를 한 번의 호출로, 버튼 트리거)
+   - 웹 검색 그라운딩으로 작품 원작/배경을 특정한 뒤 세 영역을 동시에 큐레이션
+   - 한 번의 AI 호출로 토큰·요청을 절약하면서 정확도를 높인다
+   ============================================================ */
+export async function aiCurateAll(
+  performance: Performance,
+  curriculum: Array<Pick<AchievementStandard, 'id' | 'grade' | 'subject' | 'content'>>,
+  movies: Array<{ id: number | string; title: string; overview?: string }>,
+  books: Array<{ isbn: string; title: string; description?: string }>,
+  filterKey: string,
+  signal?: AbortSignal,
+): Promise<UnifiedCuration> {
+  // 큐레이션 결과는 (공연 + 적용된 과정 필터 + 후보 구성)에 따라 달라지므로 키에 반영
+  const cacheKey = `all:${performance.id}:${filterKey}:${curriculum.slice(0, 40).map(c => c.id).join(',')}`;
+  const cached = cacheGet<UnifiedCuration>(cacheKey);
+  if (cached) return cached;
+
+  const fmt = (d?: string) => (d && d.length >= 8 ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}` : d ?? '');
+  const result = await postAI<UnifiedCuration>('curate-all', 'AI 큐레이션', {
+    performance: {
+      // 지역·회차 주석([대학로] 등)을 제거한 순수 작품명으로 검색 정확도 향상
+      title: cleanWorkTitle(performance.title),
+      genre: performance.genre,
+      synopsis: performance.synopsis ?? '',
+      keywords: performance.keywords ?? [],
+      rating: performance.rating ?? '',
+      // 웹 검색 그라운딩으로 "바로 그 공연"을 특정하기 위한 단서
+      venue: performance.venue ?? '',
+      period: `${fmt(performance.startDate)} ~ ${fmt(performance.endDate)}`,
+    },
+    curriculum: curriculum.slice(0, 40).map(c => ({
+      id: c.id, grade: c.grade, subject: c.subject, content: c.content,
+    })),
+    movies: movies.map(m => ({ id: m.id, title: m.title, overview: m.overview })),
+    books: books.map(b => ({ isbn: b.isbn, title: b.title, description: b.description })),
+  }, signal);
+
+  if (result?.curriculumSelections?.length || result?.movieSelections?.length || result?.bookSelections?.length) {
+    cacheSet(cacheKey, result);
+  }
   return result;
 }
