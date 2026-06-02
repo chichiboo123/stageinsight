@@ -126,12 +126,15 @@ function ImageModal({ images, title, onClose }: { images: string[]; title: strin
           overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${title} 공연소개 이미지`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
             공연소개 이미지 — {title}
           </h3>
-          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }}>×</button>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }} aria-label="닫기">×</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {images.map((src, i) => (
@@ -255,6 +258,9 @@ function MovieDetailModal({ movie, onClose }: { movie: Movie; onClose: () => voi
           overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${movie.title} 영화 정보`}
       >
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
           {movie.posterPath ? (
@@ -270,7 +276,7 @@ function MovieDetailModal({ movie, onClose }: { movie: Movie; onClose: () => voi
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
                 {movie.title}
               </h3>
-              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }}>×</button>
+              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }} aria-label="닫기">×</button>
             </div>
             {movie.originalTitle && movie.originalTitle !== movie.title && (
               <small style={{ color: 'var(--color-text-muted)' }}>{movie.originalTitle}</small>
@@ -326,6 +332,9 @@ function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void })
           overflow: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
         }}
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${book.title} 도서 정보`}
       >
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
           {book.image ? (
@@ -341,7 +350,7 @@ function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void })
               <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
                 {book.title}
               </h3>
-              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }}>×</button>
+              <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }} aria-label="닫기">×</button>
             </div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>{book.author}</p>
             <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>{book.publisher}</p>
@@ -743,6 +752,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   <button
                     className={`${styles.bookmarkBtn} ${isSaved('performance', displayPerformance!.id) ? styles.bookmarkSaved : ''}`}
                     title={isSaved('performance', displayPerformance!.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                    aria-label={isSaved('performance', displayPerformance!.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                     aria-pressed={isSaved('performance', displayPerformance!.id)}
                     onClick={() => isSaved('performance', displayPerformance!.id)
                       ? removeInsightItem(displayPerformance!.id)
@@ -769,7 +779,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       savedAt: new Date().toISOString(),
                     })}
                   >
-                    <span className="material-symbols-outlined">
+                    <span className="material-symbols-outlined" aria-hidden="true">
                       {isSaved('performance', displayPerformance!.id) ? 'bookmark_added' : 'bookmark_add'}
                     </span>
                   </button>
@@ -952,6 +962,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       <button
                         className={`${styles.bookmarkBtnSm} ${isSaved('standard', standard.id) ? styles.bookmarkSaved : ''}`}
                         title={isSaved('standard', standard.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                        aria-label={isSaved('standard', standard.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                         aria-pressed={isSaved('standard', standard.id)}
                         onClick={() => isSaved('standard', standard.id)
                           ? removeInsightItem(standard.id)
@@ -966,7 +977,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           savedAt: new Date().toISOString(),
                         })}
                       >
-                        <span className="material-symbols-outlined">
+                        <span className="material-symbols-outlined" aria-hidden="true">
                           {isSaved('standard', standard.id) ? 'bookmark_added' : 'bookmark_add'}
                         </span>
                       </button>
@@ -1028,6 +1039,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         <button
                           className={`${styles.bookmarkBtnSm} ${isSaved('movie', String(movie.id)) ? styles.bookmarkSaved : ''}`}
                           title={isSaved('movie', String(movie.id)) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                          aria-label={isSaved('movie', String(movie.id)) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                           aria-pressed={isSaved('movie', String(movie.id))}
                           onClick={e => {
                             e.stopPropagation();
@@ -1044,7 +1056,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          <span className="material-symbols-outlined">
+                          <span className="material-symbols-outlined" aria-hidden="true">
                             {isSaved('movie', String(movie.id)) ? 'bookmark_added' : 'bookmark_add'}
                           </span>
                         </button>
@@ -1105,6 +1117,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         <button
                           className={`${styles.bookmarkBtnSm} ${isSaved('book', book.isbn) ? styles.bookmarkSaved : ''}`}
                           title={isSaved('book', book.isbn) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
+                          aria-label={isSaved('book', book.isbn) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                           aria-pressed={isSaved('book', book.isbn)}
                           onClick={e => {
                             e.stopPropagation();
@@ -1122,7 +1135,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             });
                           }}
                         >
-                          <span className="material-symbols-outlined">
+                          <span className="material-symbols-outlined" aria-hidden="true">
                             {isSaved('book', book.isbn) ? 'bookmark_added' : 'bookmark_add'}
                           </span>
                         </button>

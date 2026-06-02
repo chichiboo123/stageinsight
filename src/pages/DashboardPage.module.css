@@ -390,12 +390,13 @@
 }
 
 /* 담기 아이콘 버튼 (공통) — 항상 우측 하단 고정 표시 */
+/* KRDS 권장 최소 터치 타깃 44×44px 확보 (모바일 접근성) */
 .bookmarkBtn {
   position: absolute;
   bottom: var(--space-3);
   right: var(--space-3);
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
@@ -411,8 +412,8 @@
   position: absolute;
   bottom: var(--space-2);
   right: var(--space-2);
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);

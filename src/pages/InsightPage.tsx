@@ -266,7 +266,7 @@ function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => 
               )}
             </div>
           </div>
-          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }}>×</button>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px', flexShrink: 0 }} aria-label="닫기">×</button>
         </div>
         {item.detail && (
           <div style={{ marginTop: '12px' }}>
@@ -386,7 +386,7 @@ function LessonPlanModal({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, fontSize: '17px' }}>✨ AI 융합예술 수업<br /><small style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{plan?.title || performanceTitle}</small></h3>
-          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }}>×</button>
+          <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }} aria-label="닫기">×</button>
         </div>
 
         {loading && (
