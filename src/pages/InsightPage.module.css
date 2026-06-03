@@ -178,6 +178,16 @@
   margin-top: var(--space-3);
 }
 
+/* 그룹 헤더 우측 액션 버튼 묶음(더 담기 · AI 융합수업 설계) */
+.groupActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .performanceGroup {
   display: flex;
   flex-direction: column;

@@ -7,6 +7,8 @@ import styles from './InsightPage.module.css';
 
 interface InsightPageProps {
   onBack?: () => void;
+  /** 특정 공연 작품의 대시보드로 돌아가 성취기준·영화·도서를 더 담기 위한 콜백 */
+  onOpenPerformance?: (performanceId: string, performanceTitle: string, meta?: InsightPerformanceMeta) => void;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -611,7 +613,7 @@ function LessonPlanModal({
   );
 }
 
-export function InsightPage({ onBack }: InsightPageProps) {
+export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
   const { state, removeInsightItem, addInsightMemo, updateInsightMemo, deleteInsightMemo, clearInsightBoard, reorderInsightItems } = useApp();
   const { insightBoard } = state;
 
@@ -948,16 +950,32 @@ export function InsightPage({ onBack }: InsightPageProps) {
                     <span className="tag" style={{ fontSize: '11px' }}>
                       {groupCount}개
                     </span>
-                    {group.items.some(i => i.type === 'performance' || i.type === 'standard') && (
-                      <button
-                        className="btn btn-outline"
-                        style={{ marginLeft: 'auto', fontSize: '12px', padding: '4px 10px' }}
-                        title="담긴 공연·성취기준·영화·도서로 작품 줄거리부터 AI 융합예술 수업까지 설계합니다."
-                        onClick={e => { e.stopPropagation(); handleGenerateLesson(group); }}
-                      >
-                        ✨ AI 융합수업 설계
-                      </button>
-                    )}
+                    <div className={styles.groupActions}>
+                      {group.performanceId && onOpenPerformance && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ fontSize: '12px', padding: '4px 10px' }}
+                          title="이 작품의 대시보드로 돌아가 성취기준·영화·도서를 더 담습니다."
+                          onClick={e => {
+                            e.stopPropagation();
+                            const perfMeta = group.items.find(i => i.type === 'performance')?.meta;
+                            onOpenPerformance(group.performanceId!, group.performanceTitle ?? '', perfMeta);
+                          }}
+                        >
+                          ➕ 더 담기
+                        </button>
+                      )}
+                      {group.items.some(i => i.type === 'performance' || i.type === 'standard') && (
+                        <button
+                          className="btn btn-outline"
+                          style={{ fontSize: '12px', padding: '4px 10px' }}
+                          title="담긴 공연·성취기준·영화·도서로 작품 줄거리부터 AI 융합예술 수업까지 설계합니다."
+                          onClick={e => { e.stopPropagation(); handleGenerateLesson(group); }}
+                        >
+                          ✨ AI 융합수업 설계
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {!isCollapsed && (<div className={styles.groupBody}>

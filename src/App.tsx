@@ -8,7 +8,7 @@ import { MapPage } from './pages/MapPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InsightPage } from './pages/InsightPage';
 import { decodeBoardGzip, isValidBoard } from './services/shareCodec';
-import type { School, Venue, InsightBoard } from './types';
+import type { School, Venue, InsightBoard, Performance, PerformanceGenre, InsightPerformanceMeta } from './types';
 
 export type Page = 'home' | 'map' | 'dashboard' | 'insight';
 const VALID_PAGES: Page[] = ['home', 'map', 'dashboard', 'insight'];
@@ -25,7 +25,7 @@ const HELP_CONTENT = [
 ];
 
 function AppInner() {
-  const { state, selectSchool, selectVenue, loadInsightBoard } = useApp();
+  const { state, selectSchool, selectVenue, selectPerformance, loadInsightBoard } = useApp();
   const [showHelp, setShowHelp] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -155,6 +155,32 @@ function AppInner() {
     navigateTo('home');  // 공연장 목록은 홈 페이지에 인라인으로 표시
   }
 
+  // 인사이트 바구니에서 특정 작품의 대시보드로 복귀 — 성취기준·영화·도서를 더 담기 위함.
+  // 상세(포스터·줄거리·연계자료)는 대시보드가 공연 ID로 다시 불러오므로 최소 정보만 복원한다.
+  function handleOpenPerformance(performanceId: string, performanceTitle: string, meta?: InsightPerformanceMeta) {
+    const venue: Venue = {
+      id: meta?.venueId ?? '',
+      name: meta?.venue ?? performanceTitle,
+      address: '', lat: 0, lng: 0,
+    };
+    const perf: Performance = {
+      id: performanceId,
+      title: performanceTitle,
+      venue: meta?.venue ?? '',
+      venueId: meta?.venueId ?? '',
+      genre: (meta?.genre as PerformanceGenre) ?? '복합',
+      state: '공연중',
+      startDate: '',
+      endDate: '',
+      poster: undefined,
+    };
+    // 순서 중요: SELECT_VENUE는 선택 공연을 비우므로 공연장을 먼저 설정한다.
+    selectVenue(venue);
+    selectPerformance(perf);
+    prevPageRef.current = 'insight';
+    navigateTo('dashboard');
+  }
+
   // ── JSON 저장/불러오기 ──
   function handleSaveJSON() {
     const json = JSON.stringify(state.insightBoard, null, 2);
@@ -220,7 +246,10 @@ function AppInner() {
         {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
         {page === 'dashboard' && <DashboardPage onGoToMap={handleGoToMap} />}
         {page === 'insight'   && (
-          <InsightPage onBack={() => navigateTo(prevPageRef.current)} />
+          <InsightPage
+            onBack={() => navigateTo(prevPageRef.current)}
+            onOpenPerformance={handleOpenPerformance}
+          />
         )}
       </div>
 
