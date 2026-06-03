@@ -147,6 +147,13 @@ function AppInner() {
     navigateTo('dashboard');
   }
 
+  // 작품 검색 흐름에서 학교 선택을 건너뛰고 곧장 그 작품의 수업 설계 대시보드로 진입
+  function handleDesignPerformance(venue: Venue, perf: Performance) {
+    selectVenue(venue);        // SELECT_VENUE가 선택 공연을 비우므로 공연장을 먼저 설정
+    selectPerformance(perf);
+    navigateTo('dashboard');
+  }
+
   function handleGoToHome() {
     selectSchool(null);
     navigateTo('home');
@@ -244,7 +251,7 @@ function AppInner() {
       )}
 
       <div style={{ flex: 1 }}>
-        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} onVenueSelect={handleVenueSelect} />}
+        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} onVenueSelect={handleVenueSelect} onOpenPerformance={handleDesignPerformance} />}
         {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
         {page === 'dashboard' && <DashboardPage onGoToMap={handleGoToMap} />}
         {page === 'insight'   && (

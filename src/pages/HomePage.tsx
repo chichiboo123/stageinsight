@@ -12,11 +12,13 @@ import styles from './HomePage.module.css';
 interface HomePageProps {
   onSchoolSelect: (school: School) => void;
   onVenueSelect: (venue: Venue) => void;
+  /** 학교 선택 없이 작품만으로 곧장 대시보드(수업 설계)로 진입 */
+  onOpenPerformance?: (venue: Venue, perf: Performance) => void;
 }
 
 type SearchMode = 'school' | 'performance';
 
-export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
+export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance }: HomePageProps) {
   const { state } = useApp();
   const [mode, setMode] = useState<SearchMode>('school');
 
@@ -68,6 +70,19 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
     setSelectedPerf(perf);
     clearPerfResults();
     setPerfQuery('');
+  }
+
+  // 학교 선택을 건너뛰고 작품만으로 곧장 수업 설계 대시보드로 진입
+  function handleDesignWithPerformance() {
+    if (!selectedPerf) return;
+    const venue: Venue = {
+      id: selectedPerf.venueId,
+      name: selectedPerf.venue,
+      address: venueInfo?.address || selectedPerf.venue,
+      lat: venueInfo?.lat ?? 0,
+      lng: venueInfo?.lng ?? 0,
+    };
+    onOpenPerformance?.(venue, selectedPerf);
   }
 
   function handleReverseSchoolSelect(school: School) {
@@ -256,15 +271,27 @@ export function HomePage({ onSchoolSelect, onVenueSelect }: HomePageProps) {
               <small style={{ color: 'var(--color-text-secondary)' }}>📍 {selectedPerf.venue}</small>
               <small style={{ color: 'var(--color-text-muted)' }}>{selectedPerf.startDate} ~ {selectedPerf.endDate}</small>
             </div>
-            <button className="btn btn-ghost" style={{ fontSize: 'var(--font-size-sm)', alignSelf: 'flex-start' }}
-              onClick={() => setSelectedPerf(null)}>다른 작품 선택</button>
+            <div className={styles.selectedPerfActions}>
+              {onOpenPerformance && (
+                <button className="btn btn-primary" style={{ fontSize: 'var(--font-size-sm)', whiteSpace: 'nowrap' }}
+                  onClick={handleDesignWithPerformance}
+                  title="학교 선택 없이 이 작품으로 바로 교육과정 연계·수업 설계를 시작합니다.">
+                  🎨 이 작품으로 수업 설계 →
+                </button>
+              )}
+              <button className="btn btn-ghost" style={{ fontSize: 'var(--font-size-sm)' }}
+                onClick={() => setSelectedPerf(null)}>다른 작품 선택</button>
+            </div>
           </div>
 
-          {/* 인근 학교 */}
+          {/* 인근 학교 (선택 사항) */}
           <div className={styles.venueSectionHeader} style={{ marginTop: 'var(--space-5)' }}>
             <h2 className={styles.venueSectionTitle}>🏫 {selectedPerf.venue} 인근 학교</h2>
             <small className={styles.venueCount}>반경 10km</small>
           </div>
+          <p className={styles.venueCount}>
+            학교를 선택하면 그 학교 기준으로 주변 공연장을 탐색합니다. <b>학교 선택은 선택 사항</b>이며, 건너뛰려면 위의 <b>‘🎨 이 작품으로 수업 설계’</b>를 누르세요.
+          </p>
 
           {schoolsLoading && (
             <div className={styles.venueLoading}><span className={styles.spinner} /><span>학교 검색 중...</span></div>
