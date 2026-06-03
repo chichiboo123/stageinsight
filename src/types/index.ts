@@ -178,6 +178,7 @@ export interface Book {
 export interface InsightPerformanceMeta {
   genre?: string;
   venue?: string;
+  venueId?: string;    // 공연장 ID — 바구니에서 작품 대시보드로 복귀 시 공연 목록 복원용
   price?: string;
   runtime?: string;
   rating?: string;     // 관람연령

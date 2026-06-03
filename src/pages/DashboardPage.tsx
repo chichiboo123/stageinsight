@@ -681,6 +681,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
       meta: {
         genre: displayPerformance.genre,
         venue: displayPerformance.venue,
+        venueId: displayPerformance.venueId,
         price: displayPerformance.price,
         runtime: displayPerformance.runtime,
         rating: displayPerformance.rating,
