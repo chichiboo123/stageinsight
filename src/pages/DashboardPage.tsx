@@ -56,7 +56,10 @@ function PosterFallback({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
 
 // ---------- 아동 배지 ----------
 function ChildBadge({ child }: { child: boolean | undefined }) {
-  if (child === undefined) return null;
+  // KOPIS의 child 필드는 '아동 관람 가능 여부' 신호로 신뢰도가 낮다.
+  // (예: '만 7세 이상' 작품이 false로 와서 '아동관람불가'로 오표기됨)
+  // → 긍정 정보(아동관람가)일 때만 표시하고, 부정 표기는 하지 않는다. 연령 등급은 별도 태그가 안내.
+  if (child !== true) return null;
   return (
     <span style={{
       display: 'inline-flex',
@@ -66,11 +69,11 @@ function ChildBadge({ child }: { child: boolean | undefined }) {
       borderRadius: '999px',
       fontSize: '11px',
       fontWeight: 600,
-      background: child ? '#fef9c3' : '#f1f5f9',
-      color: child ? '#a16207' : '#64748b',
-      border: `1px solid ${child ? '#fde68a' : '#e2e8f0'}`,
+      background: '#fef9c3',
+      color: '#a16207',
+      border: '1px solid #fde68a',
     }}>
-      {child ? '👶 아동관람가' : '🔞 아동관람불가'}
+      👶 아동관람가
     </span>
   );
 }
@@ -874,13 +877,12 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       <span className={`tag ${styles.stateTag}`} data-state={perf.state}>
                         {perf.state}
                       </span>
-                      {perf.child !== undefined && (
+                      {perf.child === true && (
                         <span style={{
                           fontSize: '10px', padding: '2px 6px', borderRadius: '999px',
-                          background: perf.child ? '#fef9c3' : '#f1f5f9',
-                          color: perf.child ? '#a16207' : '#64748b',
+                          background: '#fef9c3', color: '#a16207',
                         }}>
-                          {perf.child ? '👶 아동' : '🔞'}
+                          👶 아동
                         </span>
                       )}
                     </div>
@@ -961,6 +963,21 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                   {/* 작품 소개: 위키백과(무료) + AI 심화(선택) */}
                   {!detailLoading && displayPerformance!.title && (
                     <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <button
+                        className={`btn btn-sm ${isSaved('performance', displayPerformance!.id) ? 'btn-primary' : 'btn-outline'}`}
+                        aria-pressed={isSaved('performance', displayPerformance!.id)}
+                        onClick={() => {
+                          if (isSaved('performance', displayPerformance!.id)) {
+                            removeInsightItem(displayPerformance!.id);
+                            return;
+                          }
+                          const perf = buildPerformanceItem();
+                          if (perf) addInsightItem(perf);
+                        }}
+                        title={isSaved('performance', displayPerformance!.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
+                      >
+                        {isSaved('performance', displayPerformance!.id) ? '✓ 바구니에 담김' : '🔖 바구니에 담기'}
+                      </button>
                       <button
                         className="btn btn-primary btn-sm"
                         onClick={handleShowWiki}
@@ -1082,25 +1099,6 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                       </div>
                     </div>
                   )}
-
-                  <button
-                    className={`${styles.bookmarkBtn} ${isSaved('performance', displayPerformance!.id) ? styles.bookmarkSaved : ''}`}
-                    title={isSaved('performance', displayPerformance!.id) ? '바구니에서 빼기' : '인사이트 바구니에 담기'}
-                    aria-label={isSaved('performance', displayPerformance!.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
-                    aria-pressed={isSaved('performance', displayPerformance!.id)}
-                    onClick={() => {
-                      if (isSaved('performance', displayPerformance!.id)) {
-                        removeInsightItem(displayPerformance!.id);
-                        return;
-                      }
-                      const perf = buildPerformanceItem();
-                      if (perf) addInsightItem(perf);
-                    }}
-                  >
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      {isSaved('performance', displayPerformance!.id) ? 'bookmark_added' : 'bookmark_add'}
-                    </span>
-                  </button>
                 </div>
               </section>
 

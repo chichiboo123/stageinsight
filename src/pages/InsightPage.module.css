@@ -80,10 +80,7 @@
 
 /* 2-column layout */
 .layout {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: var(--space-8);
-  align-items: start;
+  display: block;   /* 메모를 팝업으로 분리 → 바구니가 전체 폭을 사용 */
 }
 
 /* 섹션 */
@@ -520,15 +517,6 @@
 }
 
 /* ─── 반응형 ─── */
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .memoInput {
-    position: static;
-  }
-}
-
 @media (max-width: 600px) {
   .page {
     padding-top: var(--space-5);

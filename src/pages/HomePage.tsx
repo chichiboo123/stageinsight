@@ -9,18 +9,20 @@ import { fetchPerformancesByVenue } from '../services/kopis';
 import type { School, Venue, Performance } from '../types';
 import styles from './HomePage.module.css';
 
+export type SearchMode = 'school' | 'performance';
+
 interface HomePageProps {
   onSchoolSelect: (school: School) => void;
   onVenueSelect: (venue: Venue) => void;
   /** 학교 선택 없이 작품만으로 곧장 대시보드(수업 설계)로 진입 */
   onOpenPerformance?: (venue: Venue, perf: Performance) => void;
+  /** 검색 모드(상위에서 공유 — 상단 진행표시줄과 동기화) */
+  mode: SearchMode;
+  onModeChange: (mode: SearchMode) => void;
 }
 
-type SearchMode = 'school' | 'performance';
-
-export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance }: HomePageProps) {
+export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance, mode, onModeChange }: HomePageProps) {
   const { state } = useApp();
-  const [mode, setMode] = useState<SearchMode>('school');
 
   // ── 학교 모드 ──
   const { query, setQuery, schools, loading, error, clearResults } = useSchoolSearch();
@@ -60,7 +62,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance }: H
   }
 
   function handleModeSwitch(next: SearchMode) {
-    setMode(next);
+    onModeChange(next);
     clearResults();
     clearPerfResults();
     setSelectedPerf(null);
@@ -99,7 +101,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance }: H
       onVenueSelect(syntheticVenue);
     } else {
       // venueInfo 없으면 학교 선택 모드로 폴백
-      setMode('school');
+      onModeChange('school');
       setSelectedPerf(null);
     }
   }
@@ -338,8 +340,8 @@ export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance }: H
         </section>
       )}
 
-      {/* 기능 소개 카드 */}
-      {!hasSchool && mode === 'school' && !selectedPerf && (
+      {/* 기능 소개 카드 — 두 모드 모두 초기 화면에서 동일하게 노출(UI 통일) */}
+      {!hasSchool && !selectedPerf && (
         <section className={`container ${styles.features}`}>
           {FEATURES.map((feat, i) => (
             <div key={i} className={`card ${styles.featureCard} fade-in`} style={{ animationDelay: `${i * 80}ms` }}>
