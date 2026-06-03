@@ -385,6 +385,34 @@
   white-space: pre-wrap;
   line-height: 1.6;
   flex: 1;
+  min-width: 0;
+}
+
+/* 접힌 상태: 6줄까지만 보여주고 아래를 페이드 처리 */
+.memoClamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  position: relative;
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
+/* 펼치기/접기 토글 */
+.memoToggle {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--color-accent-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  padding: 2px 0;
+  margin-top: 2px;
+}
+.memoToggle:hover {
+  text-decoration: underline;
 }
 
 .memoBtns {

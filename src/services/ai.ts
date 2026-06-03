@@ -139,9 +139,12 @@ export async function aiLessonIdeas(params: {
   movies: string[];
   books: string[];
   cacheKey: string;
+  force?: boolean;   // 재생성: 캐시를 무시하고 새로 생성한다
 }): Promise<LessonPlan> {
-  const cached = cacheGet<LessonPlan>(`lesson:${params.cacheKey}`);
-  if (cached) return cached;
+  if (!params.force) {
+    const cached = cacheGet<LessonPlan>(`lesson:${params.cacheKey}`);
+    if (cached) return cached;
+  }
 
   const result = await postAI<LessonPlan>('lesson-ideas', '융합수업 설계', {
     performanceTitle: cleanWorkTitle(params.performanceTitle),
@@ -158,6 +161,7 @@ export async function aiLessonIdeas(params: {
     movies: params.movies,
     books: params.books,
   });
+  // 재생성(force) 시에도 최신 결과를 캐시에 덮어써 다음 조회에 반영
   cacheSet(`lesson:${params.cacheKey}`, result);
   return result;
 }
