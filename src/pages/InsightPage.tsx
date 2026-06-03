@@ -672,6 +672,12 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     });
   }, []);
   const [copiedMemoId, setCopiedMemoId] = useState<string | null>(null);
+  // 메모 작성 팝업
+  const [memoModalOpen, setMemoModalOpen] = useState(false);
+  const openMemoComposer = useCallback((perfId = '') => {
+    setSelectedPerfId(perfId);
+    setMemoModalOpen(true);
+  }, []);
   const handleCopyMemo = useCallback(async (id: string, content: string) => {
     try {
       await navigator.clipboard.writeText(content);
@@ -810,6 +816,7 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     const perf = linkedPerformances.find(p => p.id === selectedPerfId);
     addInsightMemo(newMemo.trim(), perf?.id, perf?.title);
     setNewMemo('');
+    setMemoModalOpen(false);
   }
 
   function handleStartEdit(id: string, content: string) {
@@ -915,6 +922,12 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
               </svg>
               {shareMsg || 'URL 공유'}
             </button>
+            <button className={`btn btn-primary ${styles.exportBtn}`} onClick={() => openMemoComposer('')} title="수업 아이디어 메모를 작성합니다.">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+              </svg>
+              메모 작성
+            </button>
           </div>
           <button
             className={`btn btn-ghost ${styles.clearBtn}`}
@@ -995,6 +1008,14 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                       {groupCount}개
                     </span>
                     <div className={styles.groupActions}>
+                      <button
+                        className="btn btn-outline"
+                        style={{ fontSize: '12px', padding: '4px 10px' }}
+                        title="이 작품에 수업 아이디어 메모를 추가합니다."
+                        onClick={e => { e.stopPropagation(); openMemoComposer(group.performanceId ?? ''); }}
+                      >
+                        📝 메모
+                      </button>
                       {group.performanceId && onOpenPerformance && (
                         <button
                           className="btn btn-outline"
@@ -1145,12 +1166,33 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
             </div>
           )}
         </section>
+      </div>
 
-        {/* 오른쪽: 메모 입력 */}
-        <section className={styles.section}>
-          <h2 className="section-title">수업 아이디어 메모</h2>
+      {selectedItem && (
+        <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
 
-          <div className={`card ${styles.memoInput}`}>
+      {/* 메모 작성 모달 — 우측 고정 패널 대신 팝업으로 전환해 바구니를 넓게 사용 */}
+      {memoModalOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+          }}
+          onClick={() => setMemoModalOpen(false)}
+        >
+          <div
+            className="card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="수업 아이디어 메모 작성"
+            style={{ maxWidth: '520px', width: '100%', padding: '24px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '17px' }}>📝 수업 아이디어 메모</h3>
+              <button className="btn btn-ghost" onClick={() => setMemoModalOpen(false)} style={{ fontSize: '20px', padding: '4px 10px' }} aria-label="닫기">×</button>
+            </div>
             {linkedPerformances.length > 0 && (
               <div className={styles.perfSelectRow}>
                 <label className={styles.perfSelectLabel}>공연 연결</label>
@@ -1171,33 +1213,18 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
               value={newMemo}
               onChange={e => setNewMemo(e.target.value)}
               placeholder="수업 아이디어, 활동 계획, 참고사항 등을 자유롭게 기록하세요..."
-              rows={5}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && e.ctrlKey) handleAddMemo();
-              }}
+              rows={6}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) handleAddMemo(); }}
             />
             <div className={styles.memoActions}>
-              <small className={styles.hint}>Ctrl+Enter로 저장</small>
-              <button
-                className="btn btn-primary"
-                onClick={handleAddMemo}
-                disabled={!newMemo.trim()}
-              >
+              <small className={styles.hint}>Ctrl+Enter로 저장 · 저장한 메모는 공연 그룹 안에 표시됩니다</small>
+              <button className="btn btn-primary" onClick={handleAddMemo} disabled={!newMemo.trim()}>
                 메모 추가
               </button>
             </div>
           </div>
-
-          {insightBoard.memos.length === 0 && insightBoard.items.length > 0 && (
-            <p className={styles.emptyMemo}>
-              위에서 메모를 추가하면 공연 그룹 안에 함께 표시됩니다.
-            </p>
-          )}
-        </section>
-      </div>
-
-      {selectedItem && (
-        <ItemDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+        </div>
       )}
 
       {lessonOpen && (

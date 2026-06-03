@@ -1,14 +1,16 @@
 import styles from './StepProgress.module.css';
 
 export interface StepProgressProps {
+  /** 검색 모드 — 단계 라벨을 모드에 맞춰 표시 */
+  mode: 'school' | 'performance';
   /** 현재 학교가 선택되었는지 */
   hasSchool: boolean;
   /** 현재 공연장이 선택되었는지 */
   hasVenue: boolean;
   /** 공연 대시보드(3단계)에 머무르고 있는지 */
   onDashboard: boolean;
-  onStep1: () => void;   // 학교 검색
-  onStep2: () => void;   // 공연장 선택
+  onStep1: () => void;   // 1단계 검색
+  onStep2: () => void;   // 2단계
   onStep3: () => void;   // 공연·교육과정
 }
 
@@ -16,24 +18,27 @@ type Status = 'done' | 'current' | 'todo';
 
 /**
  * 검색 절차를 한눈에 보여주는 단계 표시기 (KRDS 프로세스/스텝 패턴).
- * - 완료한 단계는 클릭해 되돌아갈 수 있다.
- * - 현재 단계는 aria-current="step"으로 표시해 스크린리더 접근성을 확보한다.
+ * - 모드(학교→공연장 / 작품→학교)에 따라 단계 라벨이 달라진다.
+ * - 완료한 단계는 클릭해 되돌아갈 수 있고, 현재 단계는 aria-current="step"으로 표시한다.
  */
 export function StepProgress({
-  hasSchool, hasVenue, onDashboard, onStep1, onStep2, onStep3,
+  mode, hasSchool, hasVenue, onDashboard, onStep1, onStep2, onStep3,
 }: StepProgressProps) {
-  // 단계별 상태 계산
-  const step3Status: Status = onDashboard ? 'current' : 'todo';
-  const step2Status: Status = hasVenue ? 'done' : hasSchool && !onDashboard ? 'current' : 'todo';
-  const step1Status: Status = hasSchool ? 'done' : 'current';
-
   const steps: Array<{
     n: number; label: string; short: string; hint: string; status: Status; onClick: () => void; clickable: boolean;
-  }> = [
-    { n: 1, label: '학교 검색', short: '학교', hint: '학교를 찾으세요', status: step1Status, onClick: onStep1, clickable: true },
-    { n: 2, label: '공연장 선택', short: '공연장', hint: '주변 공연장', status: step2Status, onClick: onStep2, clickable: hasSchool },
-    { n: 3, label: '공연·교육과정', short: '교육과정', hint: '연계 자료 보기', status: step3Status, onClick: onStep3, clickable: hasVenue },
-  ];
+  }> = mode === 'performance'
+    ? [
+        // 작품 → 학교 흐름: 작품 검색 → (인근 학교, 선택) → 공연·교육과정
+        { n: 1, label: '작품 검색', short: '작품', hint: '작품을 찾으세요', status: onDashboard ? 'done' : 'current', onClick: onStep1, clickable: true },
+        { n: 2, label: '인근 학교(선택)', short: '인근 학교', hint: '학교 선택은 선택사항', status: onDashboard ? 'done' : 'todo', onClick: onStep1, clickable: !onDashboard },
+        { n: 3, label: '공연·교육과정', short: '교육과정', hint: '연계 자료·수업 설계', status: onDashboard ? 'current' : 'todo', onClick: onStep3, clickable: hasVenue },
+      ]
+    : [
+        // 학교 → 공연장 흐름
+        { n: 1, label: '학교 검색', short: '학교', hint: '학교를 찾으세요', status: hasSchool ? 'done' : 'current', onClick: onStep1, clickable: true },
+        { n: 2, label: '공연장 선택', short: '공연장', hint: '주변 공연장', status: hasVenue ? 'done' : hasSchool && !onDashboard ? 'current' : 'todo', onClick: onStep2, clickable: hasSchool },
+        { n: 3, label: '공연·교육과정', short: '교육과정', hint: '연계 자료 보기', status: onDashboard ? 'current' : 'todo', onClick: onStep3, clickable: hasVenue },
+      ];
 
   return (
     <nav className={styles.wrap} aria-label="진행 단계">

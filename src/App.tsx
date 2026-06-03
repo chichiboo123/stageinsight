@@ -3,7 +3,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { Header } from './components/layout/Header';
 import { StepProgress } from './components/layout/StepProgress';
-import { HomePage } from './pages/HomePage';
+import { HomePage, type SearchMode } from './pages/HomePage';
 import { MapPage } from './pages/MapPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InsightPage } from './pages/InsightPage';
@@ -29,6 +29,8 @@ const HELP_CONTENT = [
 function AppInner() {
   const { state, selectSchool, selectVenue, selectPerformance, loadInsightBoard } = useApp();
   const [showHelp, setShowHelp] = useState(false);
+  // 검색 모드(학교→공연장 / 작품→학교) — 홈과 상단 진행표시줄이 공유
+  const [searchMode, setSearchMode] = useState<SearchMode>('school');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── 페이지 상태 (localStorage 초기화 + 유효성 검사) ──
@@ -238,9 +240,10 @@ function AppInner() {
         onHelpClick={() => setShowHelp(true)}
       />
 
-      {/* 검색 절차 단계 표시기 — 홈/공연장/대시보드 흐름에서만 노출 */}
+      {/* 검색 절차 단계 표시기 — 홈/공연장/대시보드 흐름에서만 노출 (모드별 라벨) */}
       {page !== 'insight' && (
         <StepProgress
+          mode={searchMode}
           hasSchool={!!state.selectedSchool}
           hasVenue={!!state.selectedVenue}
           onDashboard={page === 'dashboard'}
@@ -251,7 +254,7 @@ function AppInner() {
       )}
 
       <div style={{ flex: 1 }}>
-        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} onVenueSelect={handleVenueSelect} onOpenPerformance={handleDesignPerformance} />}
+        {page === 'home'      && <HomePage onSchoolSelect={handleSchoolSelect} onVenueSelect={handleVenueSelect} onOpenPerformance={handleDesignPerformance} mode={searchMode} onModeChange={setSearchMode} />}
         {page === 'map'       && <MapPage onVenueSelect={handleVenueSelect} onGoToHome={handleGoToHome} />}
         {page === 'dashboard' && <DashboardPage onGoToMap={handleGoToMap} />}
         {page === 'insight'   && (
