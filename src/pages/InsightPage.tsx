@@ -77,6 +77,11 @@ function groupByPerformance(items: InsightItem[], memos: InsightMemo[]): Perform
     return 0;
   });
 
+  // 각 그룹 안에서 공연 항목은 항상 맨 위에 고정한다(나머지는 기존 순서 유지 — 안정 정렬).
+  for (const group of groups) {
+    group.items.sort((a, b) => Number(b.type === 'performance') - Number(a.type === 'performance'));
+  }
+
   return groups;
 }
 

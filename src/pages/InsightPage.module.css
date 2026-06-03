@@ -202,13 +202,18 @@
   background: var(--color-accent-light);
   border-radius: var(--radius-md);
   border-left: 4px solid var(--color-accent-primary);
+  /* 폭이 좁으면 액션 버튼을 아래 줄로 흘려 제목이 세로로 깨지지 않게 한다 */
+  flex-wrap: wrap;
 }
 
 .groupTitle {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  flex: 1;
+  /* 좁은 카드에서도 한 글자씩 세로로 쪼개지지 않도록 최소 폭 확보 */
+  flex: 1 1 auto;
+  min-width: 90px;
+  word-break: keep-all;
 }
 
 /* 아이템 목록 — 균일한 가로 행으로 정렬해 깔끔하게 */
