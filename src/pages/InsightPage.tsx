@@ -616,9 +616,19 @@ function LessonPlanModal({
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
-              <button className="btn btn-outline" onClick={onRegenerate} title="캐시를 무시하고 새로운 수업안을 생성합니다.">🔄 다시 생성</button>
-              <button className="btn btn-outline" onClick={handleCopy}>{copied ? '✅ 복사됨' : '📋 텍스트 복사'}</button>
-              <button className="btn btn-primary" onClick={onSaveMemo}>📝 메모로 저장</button>
+              <button className="btn btn-outline" onClick={onRegenerate} title="캐시를 무시하고 새로운 수업안을 생성합니다." style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>refresh</span>
+                다시 생성
+              </button>
+              <button className="btn btn-outline" onClick={handleCopy} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {copied
+                  ? <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>check</span> 복사됨</>
+                  : <><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>content_copy</span> 텍스트 복사</>}
+              </button>
+              <button className="btn btn-primary" onClick={onSaveMemo} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>save</span>
+                메모로 저장
+              </button>
             </div>
             <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
               AI 생성 결과는 참고용입니다. 수업 적용 전 내용을 검토해 주세요.
@@ -641,6 +651,7 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
   const [copyMsg, setCopyMsg] = useState('');
   const [shareMsg, setShareMsg] = useState('');
   const [selectedItem, setSelectedItem] = useState<InsightItem | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -891,44 +902,17 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
         </div>
       </div>
 
-      {/* 액션 툴바: 내보내기 + 비우기 (모든 동작을 한 줄에 모음) */}
+      {/* 액션 툴바: 메모 작성 + 비우기 */}
       {!isEmpty && (
         <div className={styles.actionBar}>
-          <div className={styles.exportBtns}>
-            <button className={`btn btn-outline ${styles.exportBtn}`} onClick={() => exportAsImage(insightBoard)}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              이미지 저장
-            </button>
-            <button className={`btn btn-outline ${styles.exportBtn}`} onClick={() => exportAsPDF(insightBoard)}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-              </svg>
-              PDF 인쇄
-            </button>
-            <button className={`btn btn-outline ${styles.exportBtn}`} onClick={handleCopy}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-              {copyMsg || '클립보드 복사'}
-            </button>
-            <button className={`btn btn-outline ${styles.exportBtn}`} onClick={handleShare}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-              </svg>
-              {shareMsg || 'URL 공유'}
-            </button>
-            <button className={`btn btn-primary ${styles.exportBtn}`} onClick={() => openMemoComposer('')} title="수업 아이디어 메모를 작성합니다.">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-              </svg>
-              메모 작성
-            </button>
-          </div>
+          <button
+            className={`btn btn-primary ${styles.memoBtn}`}
+            onClick={() => openMemoComposer('')}
+            title="수업 아이디어 메모를 작성합니다."
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">edit_note</span>
+            메모 작성
+          </button>
           <button
             className={`btn btn-ghost ${styles.clearBtn}`}
             title="바구니 비우기"
@@ -938,13 +922,48 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
               }
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6"/><path d="M14 11v6"/>
-              <path d="M9 6V4h6v2"/>
-            </svg>
+            <span className="material-symbols-outlined" aria-hidden="true">delete</span>
             비우기
+          </button>
+        </div>
+      )}
+
+      {/* 내보내기 FAB Speed Dial */}
+      {!isEmpty && (
+        <div className={styles.exportFab}>
+          {fabOpen && (
+            <>
+              <button className={styles.fabOverlay} onClick={() => setFabOpen(false)} aria-label="닫기" />
+              <div className={styles.fabMenu}>
+                {(copyMsg || shareMsg) && (
+                  <span className={styles.fabToast}>{copyMsg || shareMsg}</span>
+                )}
+                <button className={styles.fabMenuItem} onClick={() => { exportAsImage(insightBoard); setFabOpen(false); }}>
+                  <span className="material-symbols-outlined">image</span>
+                  이미지 저장
+                </button>
+                <button className={styles.fabMenuItem} onClick={() => { exportAsPDF(insightBoard); setFabOpen(false); }}>
+                  <span className="material-symbols-outlined">picture_as_pdf</span>
+                  PDF 인쇄
+                </button>
+                <button className={styles.fabMenuItem} onClick={handleCopy}>
+                  <span className="material-symbols-outlined">content_copy</span>
+                  {copyMsg || '클립보드 복사'}
+                </button>
+                <button className={styles.fabMenuItem} onClick={handleShare}>
+                  <span className="material-symbols-outlined">ios_share</span>
+                  {shareMsg || 'URL 공유'}
+                </button>
+              </div>
+            </>
+          )}
+          <button
+            className={`${styles.fabMainBtn} ${fabOpen ? styles.fabMainBtnOpen : ''}`}
+            onClick={() => setFabOpen(f => !f)}
+            aria-expanded={fabOpen}
+            aria-label="내보내기"
+          >
+            <span className="material-symbols-outlined">{fabOpen ? 'close' : 'ios_share'}</span>
           </button>
         </div>
       )}
@@ -961,13 +980,13 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                   onClick={() => changeView('list')}
                   aria-pressed={viewMode === 'list'}
                   title="목록형(바)으로 보기"
-                >☰ 목록</button>
+                ><span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '14px', verticalAlign: 'middle' }}>view_list</span> 목록</button>
                 <button
                   className={`${styles.viewToggleBtn} ${viewMode === 'card' ? styles.viewToggleActive : ''}`}
                   onClick={() => changeView('card')}
                   aria-pressed={viewMode === 'card'}
                   title="카드형(폴더)으로 보기"
-                >🗂️ 카드</button>
+                ><span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '14px', verticalAlign: 'middle' }}>view_module</span> 카드</button>
               </div>
             )}
           </div>
@@ -1014,7 +1033,8 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                         title="이 작품에 수업 아이디어 메모를 추가합니다."
                         onClick={e => { e.stopPropagation(); openMemoComposer(group.performanceId ?? ''); }}
                       >
-                        📝 메모
+                        <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '14px' }}>edit_note</span>
+                        메모
                       </button>
                       {group.performanceId && onOpenPerformance && (
                         <button
@@ -1027,7 +1047,8 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                             onOpenPerformance(group.performanceId!, group.performanceTitle ?? '', perfMeta);
                           }}
                         >
-                          ➕ 더 담기
+                          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '14px' }}>add</span>
+                          더 담기
                         </button>
                       )}
                       {group.items.some(i => i.type === 'performance' || i.type === 'standard') && (
@@ -1037,7 +1058,8 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                           title="담긴 공연·성취기준·영화·도서로 작품 줄거리부터 AI 융합예술 수업까지 설계합니다."
                           onClick={e => { e.stopPropagation(); handleGenerateLesson(group); }}
                         >
-                          ✨ AI 융합수업 설계
+                          <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '14px' }}>auto_awesome</span>
+                          AI 융합수업 설계
                         </button>
                       )}
                     </div>
