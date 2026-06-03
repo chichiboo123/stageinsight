@@ -467,7 +467,7 @@ function lessonPlanToText(plan: LessonPlan, performanceTitle: string, meta?: Ins
 
 // ---------- AI 수업 아이디어 모달 ----------
 function LessonPlanModal({
-  performanceTitle, plan, meta, loading, error, onClose, onSaveMemo,
+  performanceTitle, plan, meta, loading, error, onClose, onSaveMemo, onRegenerate,
 }: {
   performanceTitle: string;
   plan: LessonPlan | null;
@@ -476,8 +476,18 @@ function LessonPlanModal({
   error: string | null;
   onClose: () => void;
   onSaveMemo: () => void;
+  onRegenerate: () => void;
 }) {
   const infoRows = metaToRows(meta);
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    if (!plan) return;
+    try {
+      await navigator.clipboard.writeText(lessonPlanToText(plan, performanceTitle, meta));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* ignore */ }
+  };
   useEffect(() => {
     const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handle);
@@ -605,7 +615,9 @@ function LessonPlanModal({
               </>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" onClick={onRegenerate} title="캐시를 무시하고 새로운 수업안을 생성합니다.">🔄 다시 생성</button>
+              <button className="btn btn-outline" onClick={handleCopy}>{copied ? '✅ 복사됨' : '📋 텍스트 복사'}</button>
               <button className="btn btn-primary" onClick={onSaveMemo}>📝 메모로 저장</button>
             </div>
             <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
@@ -650,6 +662,24 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     });
   }, []);
 
+  // 긴 메모(특히 AI 융합수업) 펼침 상태 + 복사 피드백
+  const [expandedMemos, setExpandedMemos] = useState<Set<string>>(new Set());
+  const toggleMemo = useCallback((id: string) => {
+    setExpandedMemos(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const [copiedMemoId, setCopiedMemoId] = useState<string | null>(null);
+  const handleCopyMemo = useCallback(async (id: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMemoId(id);
+      setTimeout(() => setCopiedMemoId(c => (c === id ? null : c)), 2000);
+    } catch { /* ignore */ }
+  }, []);
+
   // ── AI 수업 아이디어 ──
   const [lessonOpen, setLessonOpen] = useState(false);
   const [lessonTitle, setLessonTitle] = useState('');
@@ -658,11 +688,14 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
   const [lessonMeta, setLessonMeta] = useState<InsightPerformanceMeta | null>(null);
   const [lessonLoading, setLessonLoading] = useState(false);
   const [lessonError, setLessonError] = useState<string | null>(null);
+  // 재생성을 위해 현재 모달이 다루는 그룹을 보관
+  const lessonGroupRef = useRef<PerformanceGroup | null>(null);
 
-  const handleGenerateLesson = useCallback(async (group: PerformanceGroup) => {
+  const handleGenerateLesson = useCallback(async (group: PerformanceGroup, force = false) => {
     const title = group.performanceTitle ?? '공연 미지정';
     const perfItem = group.items.find(i => i.type === 'performance');
     const meta = perfItem?.meta ?? null;
+    lessonGroupRef.current = group;
 
     setLessonOpen(true);
     setLessonTitle(title);
@@ -698,6 +731,7 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
         movies,
         books,
         cacheKey: `${group.performanceId ?? 'none'}:${standards.map(s => s.id).join(',')}:m${movies.length}:b${books.length}`,
+        force,
       });
       setLessonPlan(plan);
     } catch (err) {
@@ -720,6 +754,11 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     );
     setLessonOpen(false);
   }, [lessonPlan, lessonTitle, lessonMeta, lessonPerfId, addInsightMemo]);
+
+  // 같은 그룹으로 캐시를 무시하고 새 수업안 생성
+  const handleRegenerateLesson = useCallback(() => {
+    if (lessonGroupRef.current) handleGenerateLesson(lessonGroupRef.current, true);
+  }, [handleGenerateLesson]);
 
   // ── 드래그 앤 드롭 ──
   const dragId = useRef<string | null>(null);
@@ -1051,17 +1090,35 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                                   <button className="btn btn-primary" onClick={() => handleSaveEdit(memo.id)}>저장</button>
                                 </div>
                               </>
-                            ) : (
+                            ) : (() => {
+                              const isLesson = memo.content.startsWith('✨ AI 융합예술 수업');
+                              const isLong = isLesson || memo.content.length > 200;
+                              const expanded = expandedMemos.has(memo.id);
+                              return (
                               <>
                                 <div className={styles.groupMemoHeader}>
-                                  <span className={styles.memoIcon}>📝</span>
-                                  <p className={styles.memoContent}>{memo.content}</p>
+                                  <span className={styles.memoIcon}>{isLesson ? '✨' : '📝'}</span>
+                                  <p className={`${styles.memoContent} ${isLong && !expanded ? styles.memoClamped : ''}`}>{memo.content}</p>
                                 </div>
+                                {isLong && (
+                                  <button
+                                    className={styles.memoToggle}
+                                    onClick={() => toggleMemo(memo.id)}
+                                    aria-expanded={expanded}
+                                  >
+                                    {expanded ? '▲ 접기' : '▼ 펼치기'}
+                                  </button>
+                                )}
                                 <div className={styles.memoBtns}>
                                   <small className={styles.memoDate}>
                                     {new Date(memo.updatedAt).toLocaleString('ko-KR')}
                                   </small>
                                   <div className={styles.memoEditBtns}>
+                                    <button
+                                      className="btn btn-ghost"
+                                      style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px' }}
+                                      onClick={() => handleCopyMemo(memo.id, memo.content)}
+                                    >{copiedMemoId === memo.id ? '복사됨' : '복사'}</button>
                                     <button
                                       className="btn btn-ghost"
                                       style={{ fontSize: 'var(--font-size-xs)', padding: '4px 10px' }}
@@ -1075,7 +1132,8 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                                   </div>
                                 </div>
                               </>
-                            )}
+                              );
+                            })()}
                           </div>
                         ))}
                     </div>
@@ -1151,6 +1209,7 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
           error={lessonError}
           onClose={() => setLessonOpen(false)}
           onSaveMemo={handleSaveLessonMemo}
+          onRegenerate={handleRegenerateLesson}
         />
       )}
     </div>
