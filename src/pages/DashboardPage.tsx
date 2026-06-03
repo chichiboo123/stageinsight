@@ -1004,10 +1004,10 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             <strong style={{ fontSize: 14 }}>✨ AI 작품 소개</strong>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               {introMsg && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginRight: 2 }}>{introMsg}</span>}
-                              <button className={styles.introToolBtn} title="텍스트 클립보드 복사" aria-label="텍스트 복사" onClick={handleCopyIntroText}>📋</button>
-                              <button className={styles.introToolBtn} title="TXT 파일 다운로드" aria-label="TXT 다운로드" onClick={handleDownloadIntroTxt}>📄</button>
-                              <button className={styles.introToolBtn} title="JPG 이미지 다운로드" aria-label="JPG 다운로드" onClick={handleDownloadIntroJpg}>🖼️</button>
-                              <button className={styles.introToolBtn} title="이미지 클립보드 복사" aria-label="이미지 복사" onClick={handleCopyIntroJpg}>📸</button>
+                              <button className={styles.introToolBtn} title="텍스트 클립보드 복사" aria-label="텍스트 복사" onClick={handleCopyIntroText}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>content_paste</span></button>
+                              <button className={styles.introToolBtn} title="TXT 파일 다운로드" aria-label="TXT 다운로드" onClick={handleDownloadIntroTxt}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>description</span></button>
+                              <button className={styles.introToolBtn} title="JPG 이미지 다운로드" aria-label="JPG 다운로드" onClick={handleDownloadIntroJpg}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>image</span></button>
+                              <button className={styles.introToolBtn} title="이미지 클립보드 복사" aria-label="이미지 복사" onClick={handleCopyIntroJpg}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>photo_camera</span></button>
                               <button className="btn btn-ghost" style={{ fontSize: 12, padding: '2px 8px' }} onClick={() => setIntro(null)}>접기</button>
                             </div>
                           </div>

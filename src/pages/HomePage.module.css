@@ -355,10 +355,14 @@
 }
 
 @media (max-width: 600px) {
+  .selectedPerfCard {
+    flex-wrap: wrap;
+  }
   .selectedPerfActions {
     flex-direction: row;
     flex-wrap: wrap;
     width: 100%;
+    flex-basis: 100%;
   }
 }
 
