@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>여기 있어 공연장 — 카드뉴스</title>
+<link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fastly.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
+/>
+<style>
+  :root {
+    --bg-1: #eff6ff;
+    --bg-2: #dbeafe;
+    --bg-3: #bfdbfe;
+    --card: #ffffff;
+    --accent: #3b82f6;
+    --accent-2: #60a5fa;
+    --accent-dark: #1d4ed8;
+    --accent-light: #bfdbfe;
+    --ink: #1e3a5f;
+    --ink-2: #3b5a8a;
+    --ink-muted: #506e96;
+    --tag-bg: #dbeafe;
+    --tag-ink: #1d4ed8;
+    --green: #22c55e;
+    --green-bg: #dcfce7;
+    --green-ink: #15803d;
+    --green-light: #bbf7d0;
+    --violet: #8b5cf6;
+    --violet-bg: #ede9fe;
+    --violet-ink: #6d28d9;
+    --amber: #f59e0b;
+    --amber-bg: #fef3c7;
+    --amber-ink: #b45309;
+    --shadow-card: 0 10px 40px rgba(59, 130, 246, 0.14);
+    --shadow-soft: 0 4px 18px rgba(59, 130, 246, 0.1);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+      Roboto, sans-serif;
+    background: linear-gradient(160deg, #f4f8ff 0%, #e6f0ff 100%);
+    color: var(--ink);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 16px 80px;
+  }
+
+  .toolbar {
+    max-width: 1080px;
+    margin: 0 auto 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .toolbar h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink-2);
+    letter-spacing: -0.01em;
+  }
+  .toolbar p {
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+  .print-btn {
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 11px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .print-btn:hover {
+    background: var(--accent-dark);
+    transform: translateY(-1px);
+  }
+
+  .deck {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* ---- 카드 공통 (4:5 인스타 비율) ---- */
+  .card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    border-radius: 36px;
+    overflow: hidden;
+    background: var(--card);
+    box-shadow: var(--shadow-card);
+    padding: 70px 68px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* 본문은 항상 세로 중앙 정렬 → 위아래 여백 균형 */
+  .body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .badge {
+    position: absolute;
+    top: 52px;
+    right: 60px;
+    z-index: 3;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    background: var(--tag-bg);
+    padding: 8px 18px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 16px;
+    letter-spacing: 0.01em;
+  }
+
+  h2.title {
+    font-size: 50px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
+    color: var(--ink);
+  }
+  h2.title .hl {
+    color: var(--accent);
+  }
+  .lead {
+    margin-top: 24px;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+  .lead b {
+    color: var(--accent-dark);
+    font-weight: 700;
+  }
+
+  .footer-tag {
+    margin-top: 30px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .footer-tag .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-2);
+  }
+
+  /* ---- 실제 화면 캡처 자리표시 ---- */
+  .shot {
+    margin-top: 30px;
+    flex: 1;
+    min-height: 240px;
+    border: 2.5px dashed var(--accent-2);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #f7faff 0%, #eef5ff 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+    padding: 24px;
+    position: relative;
+  }
+  .shot .cam {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    background: #fff;
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--accent-light);
+  }
+  .shot .si {
+    font-size: 46px;
+  }
+  .shot .st {
+    font-size: 21px;
+    font-weight: 800;
+    color: var(--accent-dark);
+  }
+  .shot .sd {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    max-width: 80%;
+  }
+  .mode-green .shot {
+    border-color: #4ade80;
+    background: linear-gradient(180deg, #f5fdf8 0%, #ecfdf3 100%);
+  }
+  .mode-green .shot .cam {
+    color: var(--green-ink);
+    border-color: var(--green-light);
+  }
+  .mode-green .shot .st {
+    color: var(--green-ink);
+  }
+  .violet-shot .shot {
+    border-color: #a78bfa;
+    background: linear-gradient(180deg, #faf8ff 0%, #f3efff 100%);
+  }
+  .violet-shot .shot .cam {
+    color: var(--violet-ink);
+    border-color: #ddd6fe;
+  }
+  .violet-shot .shot .st {
+    color: var(--violet-ink);
+  }
+
+  /* ---------- 1. 표지 ---------- */
+  .cover {
+    background: linear-gradient(160deg, #eff6ff 0%, #dbeafe 55%, #bfdbfe 100%);
+    justify-content: center;
+    text-align: center;
+    align-items: center;
+  }
+  .cover .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(2px);
+  }
+  .cover .b1 {
+    width: 360px;
+    height: 360px;
+    background: radial-gradient(circle, #ffffff 0%, rgba(255, 255, 255, 0) 70%);
+    top: -90px;
+    left: -90px;
+    opacity: 0.7;
+  }
+  .cover .b2 {
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, #93c5fd 0%, rgba(147, 197, 253, 0) 70%);
+    bottom: -70px;
+    right: -60px;
+    opacity: 0.4;
+  }
+  .cover-emoji {
+    font-size: 72px;
+    margin-bottom: 10px;
+    letter-spacing: 8px;
+  }
+  .cover-kicker {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    background: rgba(255, 255, 255, 0.72);
+    padding: 9px 22px;
+    border-radius: 999px;
+    margin-bottom: 28px;
+    backdrop-filter: blur(4px);
+  }
+  .cover h1.big {
+    font-size: 70px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.12;
+    color: var(--ink);
+  }
+  .cover .sub-en {
+    margin-top: 14px;
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .cover .cover-line {
+    margin-top: 32px;
+    font-size: 27px;
+    font-weight: 600;
+    color: var(--ink-2);
+    line-height: 1.5;
+  }
+  .cover .cover-line b {
+    color: var(--accent-dark);
+  }
+  .cover .by {
+    position: absolute;
+    bottom: 56px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  /* ---------- 공감/문제 ---------- */
+  .pain-list {
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .pain {
+    background: #f7faff;
+    border: 1.5px solid #e3edff;
+    border-radius: 22px;
+    padding: 26px 30px;
+    font-size: 23px;
+    font-weight: 600;
+    color: var(--ink-2);
+    display: flex;
+    gap: 18px;
+    align-items: center;
+  }
+  .pain .q {
+    font-size: 30px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  /* ---------- 흐름 아이콘 스트립 (한 줄 소개) ---------- */
+  .icon-strip {
+    margin-top: 40px;
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .istep {
+    flex: 1;
+    text-align: center;
+    background: #f7faff;
+    border: 1.5px solid #e7f0ff;
+    border-radius: 22px;
+    padding: 28px 12px;
+  }
+  .istep .ii {
+    font-size: 42px;
+  }
+  .istep .il {
+    margin-top: 12px;
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .istep .id {
+    margin-top: 5px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    line-height: 1.4;
+  }
+  .iarrow {
+    display: flex;
+    align-items: center;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--accent-2);
+  }
+
+  /* ---------- 모드 카드 ---------- */
+  .mode-head {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    margin-bottom: 24px;
+  }
+  .mode-chip {
+    font-size: 46px;
+    width: 96px;
+    height: 96px;
+    border-radius: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mode-blue .mode-chip {
+    background: var(--tag-bg);
+  }
+  .mode-green .mode-chip {
+    background: var(--green-bg);
+  }
+  .mode-for {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .mode-blue .mode-for {
+    color: var(--accent);
+  }
+  .mode-green .mode-for {
+    color: var(--green-ink);
+  }
+  .mode-name {
+    font-size: 40px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .flow .step {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    background: #fff;
+    border: 2px solid var(--accent-light);
+    padding: 12px 20px;
+    border-radius: 16px;
+  }
+  .mode-green .flow .step {
+    border-color: var(--green-light);
+  }
+  .flow .arr {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent-2);
+  }
+  .mode-green .flow .arr {
+    color: #4ade80;
+  }
+  .mode-desc {
+    margin-top: 24px;
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+  .mode-desc b {
+    color: var(--accent-dark);
+    font-weight: 700;
+  }
+  .mode-green .mode-desc b {
+    color: var(--green-ink);
+  }
+
+  /* ---------- 기능 그리드 ---------- */
+  .feat-grid {
+    margin-top: 34px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  .feat {
+    border-radius: 24px;
+    padding: 32px 30px;
+    background: #f7faff;
+    border: 1.5px solid #e7f0ff;
+  }
+  .feat .ic {
+    font-size: 44px;
+  }
+  .feat h3 {
+    margin-top: 14px;
+    font-size: 25px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .feat p {
+    margin-top: 8px;
+    font-size: 19px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    line-height: 1.5;
+  }
+  .feat.v {
+    background: var(--violet-bg);
+    border-color: #ddd6fe;
+  }
+  .feat.v h3 {
+    color: var(--violet-ink);
+  }
+  .feat.g {
+    background: var(--green-bg);
+    border-color: var(--green-light);
+  }
+  .feat.g h3 {
+    color: var(--green-ink);
+  }
+  .feat.a {
+    background: var(--amber-bg);
+    border-color: #fde68a;
+  }
+  .feat.a h3 {
+    color: var(--amber-ink);
+  }
+
+  /* ---------- 융합/목표 ---------- */
+  .fusion {
+    margin-top: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .fusion .pill {
+    font-size: 23px;
+    font-weight: 800;
+    padding: 18px 26px;
+    border-radius: 20px;
+    color: #fff;
+    box-shadow: var(--shadow-soft);
+  }
+  .fusion .p1 {
+    background: var(--accent);
+  }
+  .fusion .p2 {
+    background: var(--green);
+  }
+  .fusion .p3 {
+    background: var(--violet);
+  }
+  .fusion .plus {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ink-muted);
+  }
+  .arrow-down {
+    text-align: center;
+    font-size: 30px;
+    color: var(--accent-2);
+    margin: 14px 0 4px;
+  }
+
+  /* ---------- 추천 대상 ---------- */
+  .who-grid {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .who {
+    border-radius: 26px;
+    padding: 36px 30px;
+    text-align: center;
+  }
+  .who.t {
+    background: var(--tag-bg);
+  }
+  .who.a {
+    background: var(--green-bg);
+  }
+  .who .we {
+    font-size: 62px;
+  }
+  .who h3 {
+    margin-top: 12px;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .who ul {
+    margin-top: 18px;
+    list-style: none;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+  }
+  .who li {
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--ink-2);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .who li::before {
+    content: '✓';
+    color: var(--accent);
+    font-weight: 800;
+  }
+  .who.a li::before {
+    color: var(--green-ink);
+  }
+
+  /* ---------- 마무리 ---------- */
+  .outro {
+    background: linear-gradient(160deg, #1d4ed8 0%, #3b82f6 60%, #60a5fa 100%);
+    color: #fff;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+  }
+  .outro .o-emoji {
+    font-size: 64px;
+    margin-bottom: 18px;
+    letter-spacing: 8px;
+  }
+  .outro h2 {
+    font-size: 54px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
+  }
+  .outro p.o-sub {
+    margin-top: 24px;
+    font-size: 25px;
+    font-weight: 500;
+    line-height: 1.6;
+    color: #eaf2ff;
+    max-width: 82%;
+  }
+  .outro .o-cta {
+    margin-top: 38px;
+    background: #fff;
+    color: var(--accent-dark);
+    font-size: 24px;
+    font-weight: 800;
+    padding: 20px 42px;
+    border-radius: 999px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  }
+  .outro .o-by {
+    position: absolute;
+    bottom: 54px;
+    font-size: 19px;
+    font-weight: 600;
+    color: #dbeafe;
+  }
+  .outro .o-by b {
+    color: #fff;
+  }
+
+  @media print {
+    body {
+      background: #fff;
+      padding: 0;
+    }
+    .toolbar {
+      display: none;
+    }
+    .deck {
+      gap: 0;
+    }
+    .card {
+      border-radius: 0;
+      box-shadow: none;
+      page-break-after: always;
+      break-after: page;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .card {
+      padding: 40px 30px;
+      border-radius: 26px;
+    }
+    h2.title {
+      font-size: 34px;
+    }
+    .lead {
+      font-size: 18px;
+    }
+    .cover h1.big {
+      font-size: 46px;
+    }
+    .cover .cover-line {
+      font-size: 20px;
+    }
+    .mode-name {
+      font-size: 28px;
+    }
+    .feat-grid,
+    .who-grid,
+    .icon-strip {
+      grid-template-columns: 1fr;
+      flex-direction: column;
+    }
+    .iarrow {
+      transform: rotate(90deg);
+      justify-content: center;
+    }
+    .badge {
+      top: 30px;
+      right: 26px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <div>
+      <h1>여기 있어 공연장 · 홍보 카드뉴스</h1>
+      <p>점선 박스 = 실제 작동 화면 캡처를 넣을 자리입니다. 인쇄(PDF)·이미지로 저장해 활용하세요.</p>
+    </div>
+    <button class="print-btn" onclick="window.print()">🖨️ PDF / 이미지로 저장</button>
+  </div>
+
+  <div class="deck">
+
+    <!-- 1. 표지 -->
+    <section class="card cover">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="cover-emoji">🏫🎟️</div>
+      <div class="cover-kicker">교사 · 예술가를 위한 수업 연결 도구</div>
+      <h1 class="big">여기 있어<br />공연장</h1>
+      <div class="sub-en">Stage Insight</div>
+      <p class="cover-line">
+        학교와 공연예술을 잇고,<br />
+        <b>교육과정과 연계한 융합수업</b>으로 넓혀요
+      </p>
+      <div class="by">개발 · 교육뮤지컬 꿈꾸는 치수쌤</div>
+    </section>
+
+    <!-- 2. 공감 -->
+    <section class="card">
+      <div class="badge">왜 필요할까</div>
+      <div class="body">
+        <span class="eyebrow">🤔 이런 고민 있으셨나요?</span>
+        <h2 class="title">공연 한 편을<br /><span class="hl">진짜 수업</span>으로 잇고 싶을 때</h2>
+        <div class="pain-list">
+          <div class="pain"><span class="q">💬</span> "우리 학교 근처에 어떤 공연이 있는지 한눈에 보고 싶어요."</div>
+          <div class="pain"><span class="q">💬</span> "이 공연을 어떤 교과·성취기준과 연결하지?"</div>
+          <div class="pain"><span class="q">💬</span> "관람으로 끝내지 않고 수업 활동까지 만들고 싶어요."</div>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>관람을 '문화 체험'이 아닌 '배움'으로</div>
+    </section>
+
+    <!-- 3. 한 줄 소개 -->
+    <section class="card">
+      <div class="badge">한 줄 소개</div>
+      <div class="body">
+        <span class="eyebrow">✨ 여기 있어 공연장은</span>
+        <h2 class="title">
+          주변 공연을 찾아<br />
+          <span class="hl">교육과정과 연결</span>하고<br />
+          융합수업으로 키워주는 앱
+        </h2>
+        <div class="icon-strip">
+          <div class="istep">
+            <div class="ii">🗺️</div>
+            <div class="il">찾기</div>
+            <div class="id">학교 주변<br />공연장·공연</div>
+          </div>
+          <div class="iarrow">→</div>
+          <div class="istep">
+            <div class="ii">📚</div>
+            <div class="il">잇기</div>
+            <div class="id">교육과정<br />성취기준 매칭</div>
+          </div>
+          <div class="iarrow">→</div>
+          <div class="istep">
+            <div class="ii">✨</div>
+            <div class="il">키우기</div>
+            <div class="id">영화·도서까지<br />융합수업 설계</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>찾기 · 잇기 · 키우기, 세 단계면 충분해요</div>
+    </section>
+
+    <!-- 4. 모드 1: 학교 → 공연장 -->
+    <section class="card mode-blue">
+      <div class="badge">MODE 1</div>
+      <div class="body">
+        <div class="mode-head">
+          <div class="mode-chip">🏫</div>
+          <div>
+            <div class="mode-for">교사라면 — 우리 학교에서 출발</div>
+            <div class="mode-name">학교 → 공연장</div>
+          </div>
+        </div>
+        <div class="flow">
+          <span class="step">🏫 학교 검색</span>
+          <span class="arr">→</span>
+          <span class="step">🎟️ 주변 공연장</span>
+          <span class="arr">→</span>
+          <span class="step">🎬 공연 선택</span>
+          <span class="arr">→</span>
+          <span class="step">📚 교육과정</span>
+        </div>
+        <p class="mode-desc">
+          학교 이름만 검색하면 <b>반경 10km 공연장과 현재 공연</b>이 바로 떠요.
+          공연을 고르면 <b>학년군·교과 성취기준</b>이 자동으로 매칭됩니다.
+        </p>
+        <div class="shot">
+          <span class="cam">📸 캡처 자리</span>
+          <span class="si">🖥️</span>
+          <span class="st">학교 검색 → 주변 공연장 목록 화면</span>
+          <span class="sd">실제 앱에서 학교를 검색했을 때 뜨는 공연장 카드 화면을 넣어 주세요</span>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>유치원·초·중·고 모두 지원</div>
+    </section>
+
+    <!-- 5. 모드 2: 작품 → 학교 -->
+    <section class="card mode-green">
+      <div class="badge">MODE 2</div>
+      <div class="body">
+        <div class="mode-head">
+          <div class="mode-chip">🎟️</div>
+          <div>
+            <div class="mode-for">예술가라면 — 작품에서 출발</div>
+            <div class="mode-name">작품 → 학교</div>
+          </div>
+        </div>
+        <div class="flow">
+          <span class="step">🎟️ 작품 검색</span>
+          <span class="arr">→</span>
+          <span class="step">📍 공연장 위치</span>
+          <span class="arr">→</span>
+          <span class="step">🏫 인근 학교</span>
+          <span class="arr">→</span>
+          <span class="step">🎨 수업 설계</span>
+        </div>
+        <p class="mode-desc">
+          내 작품 제목으로 검색하면 <b>공연장 주변 학교</b>가 보여요.
+          학교를 고르지 않고 <b>'이 작품으로 바로 수업 설계'</b>도 가능합니다.
+        </p>
+        <div class="shot">
+          <span class="cam">📸 캡처 자리</span>
+          <span class="si">🖥️</span>
+          <span class="st">작품 검색 → 인근 학교 탐색 화면</span>
+          <span class="sd">작품으로 검색했을 때 뜨는 공연장 위치·인근 학교 화면을 넣어 주세요</span>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>학교와 예술가를 잇는 양방향 연결</div>
+    </section>
+
+    <!-- 6. 핵심 기능 -->
+    <section class="card">
+      <div class="badge">핵심 기능</div>
+      <div class="body">
+        <span class="eyebrow">🧩 버튼 하나로 끝나는 수업 준비</span>
+        <h2 class="title">복잡한 연결, <span class="hl">앱이 대신</span></h2>
+        <div class="feat-grid">
+          <div class="feat">
+            <div class="ic">📚</div>
+            <h3>교육과정 매칭</h3>
+            <p>2022 개정·특수·누리과정 성취기준을 공연 주제에 맞춰 연결</p>
+          </div>
+          <div class="feat v">
+            <div class="ic">✨</div>
+            <h3>AI 큐레이션</h3>
+            <p>성취기준·영화·도서를 한 번에 골라 적합도까지 추천</p>
+          </div>
+          <div class="feat g">
+            <div class="ic">🎬</div>
+            <h3>연계 자료 추천</h3>
+            <p>공연과 이어지는 영화·도서로 배움을 확장</p>
+          </div>
+          <div class="feat a">
+            <div class="ic">🗂️</div>
+            <h3>인사이트 바구니</h3>
+            <p>공연·자료를 작품별로 담아 정리하고 공유·저장</p>
+          </div>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>흩어진 정보 찾기는 그만, 클릭 몇 번이면 끝</div>
+    </section>
+
+    <!-- 7. 융합수업 = 목적 (+ 캡처 자리) -->
+    <section class="card violet-shot">
+      <div class="badge">우리의 목표</div>
+      <div class="body">
+        <span class="eyebrow">🎯 결국 하고 싶은 건</span>
+        <h2 class="title"><span class="hl">융합수업</span>으로 넓히는 배움</h2>
+        <div class="fusion">
+          <span class="pill p1">🎟️ 공연</span>
+          <span class="plus">+</span>
+          <span class="pill p2">📚 교육과정</span>
+          <span class="plus">+</span>
+          <span class="pill p3">🎬 영화·도서</span>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="shot">
+          <span class="cam">📸 캡처 자리</span>
+          <span class="si">📝</span>
+          <span class="st">✨ AI 융합수업 설계 결과 화면</span>
+          <span class="sd">줄거리·학습목표·활동·발문·평가까지 만들어 주는 실제 결과 화면을 넣어 주세요</span>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>공연예술이 여러 교과를 잇는 다리가 됩니다</div>
+    </section>
+
+    <!-- 8. 추천 대상 -->
+    <section class="card">
+      <div class="badge">이런 분께</div>
+      <div class="body">
+        <span class="eyebrow">🙌 누구에게 좋을까요</span>
+        <h2 class="title">교사와 예술가,<br /><span class="hl">함께 쓰는 도구</span></h2>
+        <div class="who-grid">
+          <div class="who t">
+            <div class="we">👩‍🏫</div>
+            <h3>교사</h3>
+            <ul>
+              <li>주변 공연을 수업과 연결</li>
+              <li>성취기준 매칭 시간 절약</li>
+              <li>융합수업 아이디어 확보</li>
+            </ul>
+          </div>
+          <div class="who a">
+            <div class="we">🎨</div>
+            <h3>예술가</h3>
+            <ul>
+              <li>작품에 맞는 학교 탐색</li>
+              <li>교육 연계 관람 제안</li>
+              <li>학교와의 협력 기회 확대</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer-tag"><span class="dot"></span>교실과 무대가 한 팀이 되는 순간</div>
+    </section>
+
+    <!-- 9. 마무리 CTA -->
+    <section class="card outro">
+      <div class="o-emoji">🏫🎟️📚</div>
+      <h2>지금, 학교와 공연을<br />이어보세요</h2>
+      <p class="o-sub">
+        무료로 바로 시작할 수 있어요.<br />
+        공연 한 편이 살아있는 수업이 되는 경험,<br />
+        여기 있어 공연장에서 만나요.
+      </p>
+      <div class="o-cta">여기 있어 공연장 · Stage Insight</div>
+      <div class="o-by">개발 · <b>교육뮤지컬 꿈꾸는 치수쌤</b></div>
+    </section>
+
+  </div>
+</body>
+</html>
