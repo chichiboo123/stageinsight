@@ -11,7 +11,7 @@
 src/services/ai.ts   ──POST──▶  /api/ai/<handler>
  · 버튼 트리거 전용                ├─ 개발: server/vite-plugin-ai-dev.mjs
  · 결과 localStorage 캐시          └─ 운영: netlify/functions/ai.mjs
- · aiStatus(배터리) 보고               └─ netlify/functions/_handlers.mjs ──▶ Gemini API
+ · aiStatus(AI 아이콘) 보고             └─ netlify/functions/_handlers.mjs ──▶ Gemini API
                                           netlify/functions/_gemini.mjs   (다중 모델 폴백)
 ```
 
@@ -24,15 +24,31 @@ src/services/ai.ts   ──POST──▶  /api/ai/<handler>
 
 | 순위 | 모델 | 비고 |
 |------|------|------|
-| 1 | `gemini-2.5-flash` | 품질 우선(무료 티어) |
-| 2 | `gemini-2.5-flash-lite` | 1순위 한도 초과 시 폴백 |
+| 1 | `gemini-3.1-flash-lite` | **무료 티어 일일 호출 한도 최대 → 최우선**(정식) |
+| 2 | `gemini-3.5-flash` | 신형 Flash(품질) |
+| 3 | `gemini-3-flash-preview` | Gemini 3 Flash(프리뷰) |
+| 4 | `gemini-2.5-flash` | 검증된 안정 모델(폴백) |
+| 5 | `gemini-2.5-flash-lite` | 검증된 안정 경량 모델(최종 폴백) |
 
-> 과거 체인의 `gemini-3.1-flash-lite`는 텍스트 생성 모델이 아니어서 404를 유발해 제거했다.
+> 3.x(특히 `-preview`)는 제공사가 쿼터/이름을 자주 조정·폐기한다
+> (`gemini-3.1-flash-lite-preview`는 2026-05-25 종료). 그래서 검증된 2.5 계열을
+> 하단 폴백으로 반드시 남겨 두고, 아래 2단계 복구 장치로 이름 변경에 대응한다.
 
 - **429(Rate Limit)·500·503·403·404** → 콘솔 경고 후 다음 모델로 재시도
 - **400·401**(형식/인증 오류) → 모델을 바꿔도 실패하므로 즉시 중단
 - 모든 모델 실패 시에만 사용자에게 에러 반환
-- 반환값 `{ json, model }`의 `model`로 **실제 사용된 모델**을 클라이언트에 전달 → 배터리 표시
+- 반환값 `{ json, model }`의 `model`로 **실제 사용된 모델**을 클라이언트에 전달 → AI 아이콘 색/이름 표시
+
+### 모델명 변경/폐기 대응 (이름이 바뀌어도 멈추지 않게)
+
+하드코딩된 모델명은 제공사 정책으로 언제든 바뀌거나 폐기될 수 있다. 두 단계로 방어한다.
+
+1. **환경변수 오버라이드 `GEMINI_MODELS`** — 쉼표로 구분한 체인을 주면 코드 수정/재배포 없이 교체된다.
+   예) `GEMINI_MODELS="gemini-2.5-flash,gemini-2.5-flash-lite"`. 비우면 기본 체인을 쓴다.
+2. **런타임 자동 탐색(ListModels)** — 체인의 모델이 `404`(모델 없음)로 실패하면,
+   `ListModels` API로 *지금 계정에서 실제로 쓸 수 있는* `generateContent` 텍스트 모델을 1회 탐색해
+   대기열에 자동으로 덧붙인다(이미지/임베딩/음성 모델은 제외, flash → flash-lite 순 정렬, 10분 캐시).
+   → 하드코딩된 이름이 바뀌어도 살아있는 카탈로그에서 대체 모델을 찾아 복구한다.
 
 ## 3. 핸들러 (모두 버튼 트리거)
 
@@ -71,10 +87,13 @@ src/services/ai.ts   ──POST──▶  /api/ai/<handler>
 5. **결과 캐싱**: `localStorage`(30일) — 동일 입력 재호출 0 토큰.
 6. **경량 모델 체인**: 무료 티어 Flash/Flash-Lite.
 
-## 6. 배터리 표시 (src/components/common/AIStatusBadge.tsx)
+## 6. AI 모델 표시 (src/components/common/AIStatusBadge.tsx)
 
 - 헤더에 표시. `aiStatus` 스토어 구독.
-- 호출 중 → 점멸 / 성공 → 사용 모델명 + 배터리 눈금(1순위=가득 초록, 2순위 폴백=눈금 낮음/노랑) / 실패 → 빨강.
+- **항상 같은 모양의 AI 아이콘(✦ 스파클)**을 쓰고, **색만 모델마다 다르게** 칠해 어떤 모델이 호출됐는지 구분한다(배터리 눈금 아님).
+  - 알려진 모델은 고정 색, 그 외(새/개명된 모델)는 모델 ID 해시로 결정적 색을 부여 → 이름이 바뀌어도 안정적으로 색이 매겨진다.
+- 모델 이름은 **서버가 돌려준 실제 모델 ID를 그대로 정확히 표시**한다(예: `Gemini 2.5 Flash Lite`).
+- 호출 중 → 아이콘 점멸 + "호출 중…" / 성공 → 모델 색·이름 / 실패 → 빨강 "AI 오류".
 
 ## 7. 신뢰성(폴백)
 
