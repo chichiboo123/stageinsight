@@ -138,6 +138,10 @@ export async function aiLessonIdeas(params: {
   standards: Array<Pick<AchievementStandard, 'id' | 'grade' | 'subject' | 'content'>>;
   movies: string[];
   books: string[];
+  // ── 선택 입력(맞춤형 수업 설계 옵션) ──
+  audiences?: string[];   // 수업 대상 (예: '유아', '초등 1~2학년' …) — 중복 선택
+  direction?: string;     // 수업 방향/키워드 (서술형)
+  focusSubject?: string;  // 주요 교과 (서술형)
   cacheKey: string;
   force?: boolean;   // 재생성: 캐시를 무시하고 새로 생성한다
 }): Promise<LessonPlan> {
@@ -160,6 +164,9 @@ export async function aiLessonIdeas(params: {
     standards: params.standards,
     movies: params.movies,
     books: params.books,
+    audiences: params.audiences,
+    direction: params.direction,
+    focusSubject: params.focusSubject,
   });
   // 재생성(force) 시에도 최신 결과를 캐시에 덮어써 다음 조회에 반영
   cacheSet(`lesson:${params.cacheKey}`, result);
@@ -232,7 +239,7 @@ export async function aiCurateAll(
   signal?: AbortSignal,
 ): Promise<UnifiedCuration> {
   // 큐레이션 결과는 (공연 + 적용된 과정 필터 + 후보 구성)에 따라 달라지므로 키에 반영
-  const cacheKey = `all:${performance.id}:${filterKey}:${curriculum.slice(0, 40).map(c => c.id).join(',')}`;
+  const cacheKey = `all:${performance.id}:${filterKey}:${curriculum.slice(0, 60).map(c => c.id).join(',')}`;
   const cached = cacheGet<UnifiedCuration>(cacheKey);
   if (cached) return cached;
 
@@ -249,7 +256,7 @@ export async function aiCurateAll(
       venue: performance.venue ?? '',
       period: `${fmt(performance.startDate)} ~ ${fmt(performance.endDate)}`,
     },
-    curriculum: curriculum.slice(0, 40).map(c => ({
+    curriculum: curriculum.slice(0, 60).map(c => ({
       id: c.id, grade: c.grade, subject: c.subject, content: c.content,
     })),
     movies: movies.map(m => ({ id: m.id, title: m.title, overview: m.overview })),

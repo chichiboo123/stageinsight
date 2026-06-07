@@ -24,6 +24,13 @@
   status = 200
   force = true
 
+# KOPIS 포스터 이미지 CORS 우회 프록시 (클립보드 복사/캔버스용 동일 출처 페치)
+[[redirects]]
+  from = "/api/kopis-img/*"
+  to = "http://www.kopis.or.kr/upload/:splat"
+  status = 200
+  force = true
+
 # Naver Books API CORS 우회 프록시
 [[redirects]]
   from = "/api/naver/*"

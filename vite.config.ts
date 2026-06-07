@@ -11,6 +11,12 @@ export default defineConfig({
   plugins: [react(), aiDevPlugin(), shareDevPlugin()],
   server: {
     proxy: {
+      // KOPIS 포스터 이미지 CORS 우회 (개발 환경) — 더 구체적인 경로를 먼저 둔다
+      '/api/kopis-img': {
+        target: 'http://www.kopis.or.kr/upload',
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/api\/kopis-img/, ''),
+      },
       // KOPIS API CORS 우회 (개발 환경)
       '/api/kopis': {
         target: 'http://www.kopis.or.kr/openApi/restful',

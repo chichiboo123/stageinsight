@@ -9,10 +9,29 @@ interface PosterModalProps {
 type CopyState = 'idle' | 'copying' | 'success' | 'error';
 type DownloadState = 'idle' | 'downloading' | 'error';
 
+/**
+ * KOPIS 포스터(www.kopis.or.kr/upload/...)는 CORS 헤더를 주지 않아 브라우저에서 직접
+ * fetch하면 차단된다. 동일 출처 프록시(/api/kopis-img/*)로 우회해 페치한다.
+ * (netlify.toml · vite.config.ts에 프록시 리다이렉트 설정)
+ */
+function toProxiedUrl(url: string): string {
+  const m = url.match(/^https?:\/\/www\.kopis\.or\.kr\/upload\/(.+)$/i);
+  return m ? `/api/kopis-img/${m[1]}` : url;
+}
+
 async function fetchAsBlob(url: string): Promise<Blob> {
-  const res = await fetch(url, { mode: 'cors' });
-  if (!res.ok) throw new Error('fetch failed');
-  return res.blob();
+  // 우선 동일 출처 프록시로 시도하고, 실패하면 원본 URL로 폴백한다.
+  const proxied = toProxiedUrl(url);
+  try {
+    const res = await fetch(proxied);
+    if (!res.ok) throw new Error('fetch failed');
+    return await res.blob();
+  } catch (err) {
+    if (proxied === url) throw err;
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error('fetch failed');
+    return res.blob();
+  }
 }
 
 async function blobToPngBlob(blob: Blob): Promise<Blob> {

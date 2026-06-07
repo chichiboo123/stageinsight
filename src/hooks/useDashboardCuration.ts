@@ -161,9 +161,9 @@ export function useDashboardCuration(performance: Performance | null): UseDashbo
     setAiLoading(true);
     setAiError(null);
     try {
-      // 성취기준 후보 풀(최대 40) — 과정 필터 반영
+      // 성취기준 후보 풀(최대 60, 교과·학년군 다양성 포함) — 과정 필터 반영
       const pool = await getCandidatePool(
-        keywords, synopsis, activeFilters.length > 0 ? activeFilters : undefined, 40,
+        keywords, synopsis, activeFilters.length > 0 ? activeFilters : undefined, 60,
       );
       const baseMovies = baseRef.current.movies;
       const baseBooks = baseRef.current.books;
