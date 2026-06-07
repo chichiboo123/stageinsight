@@ -1,12 +1,17 @@
 /**
- * Netlify Function — 인사이트 바구니 공유 단축 링크
+ * Netlify Function (v2) — 인사이트 바구니 공유 단축 링크
  * 경로: /api/share  →  /.netlify/functions/share  (netlify.toml redirect)
  *
  * - POST { items, memos }  → Netlify Blobs에 저장하고 짧은 id 반환 → 공유 URL은 ?s=<id>
  * - GET  ?id=<id>          → 저장된 보드 JSON 반환
  *
- * Netlify Blobs는 별도 설정 없이 사용 가능하며, 실패 시 클라이언트가
- * 기존 긴 ?share= base64 링크로 자동 폴백한다.
+ * ★ 왜 v2(`export default async (req)`) 시그니처인가
+ *   레거시 v1(`export const handler = (event)`)에서는 @netlify/blobs의 getStore()가
+ *   자동 구성되지 않아 "environment has not been configured to use Netlify Blobs"
+ *   예외가 나고, 그러면 단축 링크 생성이 매번 실패해 클라이언트가 거대한 ?z= 링크로
+ *   폴백한다(다른 기기에서 URL이 너무 길어 414 발생). v2 함수는 Blobs가 자동 구성되므로
+ *   별도 siteID/token 없이 단축 링크가 안정적으로 동작한다.
+ *   Blobs 자체가 불가한 환경이면 503을 반환해 클라이언트가 우아하게 폴백한다.
  */
 
 import { getStore } from '@netlify/blobs';
@@ -26,53 +31,56 @@ const cors = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
-export const handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: cors, body: '' };
+const json = (status, obj) => new Response(JSON.stringify(obj), { status, headers: cors });
+
+export default async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('', { status: 204, headers: cors });
   }
 
   let store;
   try {
     store = getStore(STORE);
   } catch (err) {
-    return { statusCode: 503, headers: cors, body: JSON.stringify({ error: 'share store unavailable' }) };
+    console.error('[share] Blobs 구성 실패:', err?.message ?? err);
+    return json(503, { error: 'share store unavailable' });
   }
 
   // ── 조회 ──
-  if (event.httpMethod === 'GET') {
-    const id = event.queryStringParameters?.id;
-    if (!id) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'id required' }) };
+  if (req.method === 'GET') {
+    const id = new URL(req.url).searchParams.get('id');
+    if (!id) return json(400, { error: 'id required' });
     try {
       const board = await store.get(id, { type: 'json' });
-      if (!board) return { statusCode: 404, headers: cors, body: JSON.stringify({ error: 'not found' }) };
-      return { statusCode: 200, headers: cors, body: JSON.stringify(board) };
+      if (!board) return json(404, { error: 'not found' });
+      return json(200, board);
     } catch {
-      return { statusCode: 404, headers: cors, body: JSON.stringify({ error: 'not found' }) };
+      return json(404, { error: 'not found' });
     }
   }
 
   // ── 저장 ──
-  if (event.httpMethod === 'POST') {
-    if (event.body && event.body.length > MAX_BYTES) {
-      return { statusCode: 413, headers: cors, body: JSON.stringify({ error: 'too large' }) };
-    }
+  if (req.method === 'POST') {
+    const text = await req.text();
+    if (text.length > MAX_BYTES) return json(413, { error: 'too large' });
     let board;
     try {
-      board = event.body ? JSON.parse(event.body) : null;
+      board = text ? JSON.parse(text) : null;
     } catch {
-      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'invalid json' }) };
+      return json(400, { error: 'invalid json' });
     }
     if (!board || !Array.isArray(board.items) || !Array.isArray(board.memos)) {
-      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'invalid board' }) };
+      return json(400, { error: 'invalid board' });
     }
     const id = genId();
     try {
       await store.set(id, JSON.stringify({ items: board.items, memos: board.memos }));
-    } catch {
-      return { statusCode: 503, headers: cors, body: JSON.stringify({ error: 'store failed' }) };
+    } catch (err) {
+      console.error('[share] 저장 실패:', err?.message ?? err);
+      return json(503, { error: 'store failed' });
     }
-    return { statusCode: 200, headers: cors, body: JSON.stringify({ id }) };
+    return json(200, { id });
   }
 
-  return { statusCode: 405, headers: cors, body: JSON.stringify({ error: 'Method Not Allowed' }) };
+  return json(405, { error: 'Method Not Allowed' });
 };

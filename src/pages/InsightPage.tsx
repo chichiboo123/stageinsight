@@ -149,6 +149,13 @@ async function shareAsCompressedUrl(board: InsightBoard): Promise<string> {
 }
 
 /**
+ * 폴백 URL이 다른 기기에서 안전하게 열릴 수 있는 길이인지 판단한다.
+ * 너무 긴 URL은 일부 서버/프록시/메신저에서 잘리거나 HTTP 414(URI Too Long)를 일으킨다.
+ * 단축 서버(?s=)가 일시 실패했을 때 깨진 장문 링크를 그대로 복사하지 않기 위한 상한.
+ */
+const SAFE_SHARE_URL_LEN = 4000;
+
+/**
  * 인사이트 바구니를 고해상도 PNG 이미지로 내보낸다.
  * ────────────────────────────────────────────────────────────
  * 품질 개선 포인트:
@@ -1042,26 +1049,49 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
       shareTimerRef.current = setTimeout(() => setShareMsg(''), ms);
     };
 
-    // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (가장 짧음)
+    // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (가장 짧음 · 다른 기기에서 가장 안정적)
     // 2) 서버 실패 시 gzip 압축 링크(?z=)로 폴백 — 긴 링크를 크게 단축
     // 3) gzip 미지원 브라우저는 비압축 ?share= 링크 최종 폴백
-    let url: string;
-    try {
-      const res = await fetch('/api/share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(insightBoard),
-      });
-      if (!res.ok) throw new Error('share failed');
-      const { id } = await res.json() as { id: string };
-      url = `${window.location.origin}${window.location.pathname}?s=${id}`;
-    } catch {
-      url = await shareAsCompressedUrl(insightBoard); // 폴백: gzip 압축 링크
+    // ※ 단축 서버는 일시적 오류에 대비해 1회 재시도한다.
+    const requestShortId = async (): Promise<string | null> => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(insightBoard),
+          });
+          if (!res.ok) throw new Error('share failed');
+          const { id } = await res.json() as { id: string };
+          if (id) return id;
+        } catch {
+          /* 다음 시도로 */
+        }
+      }
+      return null;
+    };
+
+    const shortId = await requestShortId();
+    if (shortId) {
+      const url = `${window.location.origin}${window.location.pathname}?s=${shortId}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        flash('✅ 공유 URL 복사됨!');
+      } catch {
+        flash('❌ 복사 실패', 2500);
+      }
+      return;
     }
 
+    // ── 단축 서버 실패 → 폴백 링크. 단, 다른 기기에서 안 열릴 만큼 길면 복사하지 않는다 ──
+    const fallbackUrl = await shareAsCompressedUrl(insightBoard);
+    if (fallbackUrl.length > SAFE_SHARE_URL_LEN) {
+      flash('⚠️ 공유 서버가 일시적으로 불안정합니다. 바구니 항목이 많아 링크가 너무 길어 다른 기기에서 열리지 않을 수 있어요. 잠시 후 다시 시도해 주세요.', 6000);
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(url);
-      flash('✅ 공유 URL 복사됨!');
+      await navigator.clipboard.writeText(fallbackUrl);
+      flash('✅ 공유 URL 복사됨! (임시 링크)');
     } catch {
       flash('❌ 복사 실패', 2500);
     }
