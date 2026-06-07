@@ -5,7 +5,7 @@
  * - 모든 AI 동작은 "사용자가 버튼을 눌렀을 때만" 실행된다(자동 호출 없음 → API 남용 방지).
  * - 토큰 절약: 결과를 localStorage에 캐싱하여 동일 입력 재호출을 차단한다.
  * - 신뢰성: 호출 실패 시 명확한 에러를 던지거나(모달 표시) null을 반환(폴백)한다.
- * - 호출 시작/성공/실패를 aiStatus 스토어에 보고해 '배터리' 표시를 갱신한다.
+ * - 호출 시작/성공/실패를 aiStatus 스토어에 보고해 'AI 모델 아이콘' 표시를 갱신한다.
  */
 
 import type {
@@ -48,7 +48,7 @@ function cacheSet<T>(key: string, value: T): void {
 /**
  * AI 게이트웨이 호출 래퍼.
  * - 시작 시 phase='calling', 성공 시 phase='success'(+사용 모델), 실패 시 phase='error'를 보고.
- * - 응답의 `_model`로 실제 사용된(폴백 포함) 모델을 배터리 표시에 반영한다.
+ * - 응답의 `_model`로 실제 사용된(폴백 포함) 모델을 AI 아이콘 색/이름에 반영한다.
  */
 async function postAI<T extends { _model?: string | null }>(
   handler: string,

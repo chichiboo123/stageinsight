@@ -17,7 +17,7 @@
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
- * 모델 우선순위 체인 (앞에서부터 시도)
+ * 기본 모델 우선순위 체인 (앞에서부터 시도)
  *  1순위: gemini-2.5-flash       — 품질 우선(무료 티어)
  *  2순위: gemini-2.5-flash-lite  — 1순위 한도 초과 시 폴백(무료 티어)
  * 두 모델 모두 thinkingBudget=0으로 '사고(thinking)' 토큰을 꺼서
@@ -25,14 +25,76 @@ const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
  *
  * ⚠ 과거 체인의 'gemini-3.1-flash-lite'는 텍스트 생성 모델이 아니라
  *   이미지 생성 계열 명칭이어서 404를 유발했다 → 제거.
+ *
+ * ★ 모델명 변경/폐기 대응 (제공사 정책으로 이름이 바뀌어도 멈추지 않게)
+ *   1) 환경변수 GEMINI_MODELS(쉼표 구분)로 코드 수정/재배포 없이 체인을 교체할 수 있다.
+ *      예) GEMINI_MODELS="gemini-2.5-flash,gemini-2.5-flash-lite"
+ *   2) 그래도 모델을 못 찾으면(404/모델 없음) 런타임에 ListModels API로
+ *      "지금 계정에서 실제로 쓸 수 있는" 텍스트 생성 모델을 자동 탐색해 체인에 덧붙인다.
+ *      → 하드코딩된 이름이 바뀌어도 살아있는 카탈로그에서 대체 모델을 찾아 복구한다.
  */
-export const MODEL_CHAIN = [
+const DEFAULT_MODEL_CHAIN = [
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
 ];
 
+/** 환경변수 오버라이드를 파싱한다(쉼표 구분, 공백 제거). 없으면 기본 체인. */
+function parseEnvModels() {
+  const raw = (typeof process !== 'undefined' && process.env && process.env.GEMINI_MODELS) || '';
+  const list = raw.split(',').map(s => s.trim()).filter(Boolean);
+  return list.length ? list : DEFAULT_MODEL_CHAIN;
+}
+
+export const MODEL_CHAIN = parseEnvModels();
+
 // 하위 호환용 기본 모델 (체인의 1순위)
 export const DEFAULT_MODEL = MODEL_CHAIN[0];
+
+/**
+ * 살아있는 모델 카탈로그 탐색 (ListModels) — 결과를 프로세스 수명 동안 캐시.
+ * ────────────────────────────────────────────────────────────
+ * generateContent를 지원하는 텍스트 생성 모델만 추려, 품질·안정성 우선으로 정렬한다.
+ *  - 이미지/임베딩/음성(tts)/실험 전용 등 텍스트 JSON 생성에 부적합한 모델은 제외.
+ *  - 'flash'(품질) → 'flash-lite'(경량) → 그 외 순으로, 최신 버전·안정판 우선.
+ * 네트워크/권한 문제로 실패하면 빈 배열을 돌려주어 기존 체인만으로 진행한다.
+ */
+let _discoveredCache = null; // { at:number, models:string[] }
+const DISCOVERY_TTL_MS = 10 * 60 * 1000;
+
+function rankModelName(name) {
+  // 점수가 낮을수록 우선. (flash 우대, lite 후순위, 실험/프리뷰 후순위)
+  let score = 0;
+  if (/flash/.test(name)) score -= 100;
+  if (/lite/.test(name)) score += 30;
+  if (/pro/.test(name)) score -= 50;
+  if (/(exp|preview|latest)/.test(name)) score += 10;
+  // 버전 숫자가 클수록(최신) 우대
+  const ver = parseFloat((name.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
+  score -= ver;
+  return score;
+}
+
+export async function discoverGenerateContentModels(apiKey) {
+  if (!apiKey) return [];
+  if (_discoveredCache && Date.now() - _discoveredCache.at < DISCOVERY_TTL_MS) {
+    return _discoveredCache.models;
+  }
+  try {
+    const res = await fetch(`${API_BASE}?key=${apiKey}&pageSize=200`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const models = (Array.isArray(data?.models) ? data.models : [])
+      .filter(m => (m?.supportedGenerationMethods ?? []).includes('generateContent'))
+      .map(m => String(m?.name ?? '').replace(/^models\//, ''))
+      // gemini 계열의 텍스트 생성 모델만 — 이미지/임베딩/음성/응답형 전용 제외
+      .filter(n => /^gemini/.test(n) && !/(embedding|image|imagen|vision|tts|audio|aqa|learnlm)/i.test(n))
+      .sort((a, b) => rankModelName(a) - rankModelName(b));
+    _discoveredCache = { at: Date.now(), models };
+    return models;
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Google 검색 그라운딩 도구.
@@ -180,14 +242,17 @@ export async function callGeminiJSON({
   }
 
   let lastError = null;
+  // 시도 대기열(처리 중 동적으로 늘어날 수 있다 — 모델명 변경/폐기 시 자동 탐색 보강).
+  const queue = [...models];
+  let discovered = false; // ListModels 자동 탐색을 1회만 수행하기 위한 가드
 
-  for (let i = 0; i < models.length; i++) {
-    const model = models[i];
+  for (let i = 0; i < queue.length; i++) {
+    const model = queue[i];
     try {
       const json = await callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget, tools });
       // 폴백이 발생했다면(첫 모델이 아니면) 로그로 남겨 추적 가능하게 한다.
       if (i > 0) {
-        console.info(`[Gemini] 폴백 성공: '${model}' 사용 (우선순위 ${i + 1}위)`);
+        console.info(`[Gemini] 폴백 성공: '${model}' 사용 (시도 ${i + 1}번째)`);
       }
       return { json, model };
     } catch (err) {
@@ -200,10 +265,23 @@ export async function callGeminiJSON({
         break;
       }
 
+      // ★ 모델을 못 찾는 오류(404 등)는 "이름이 바뀌었거나 폐기됐을" 가능성이 높다.
+      //   살아있는 카탈로그(ListModels)에서 실제 사용 가능한 모델을 1회 탐색해 대기열에 덧붙인다.
+      //   → 하드코딩된 모델명이 제공사 정책으로 바뀌어도 자동으로 복구된다.
+      if (status === 404 && !discovered) {
+        discovered = true;
+        const live = await discoverGenerateContentModels(apiKey);
+        const added = live.filter(m => !queue.includes(m));
+        if (added.length) {
+          queue.push(...added);
+          console.warn(`[Gemini] 모델 미존재(404) → 카탈로그에서 대체 모델 ${added.length}개 자동 보강: ${added.slice(0, 5).join(', ')}…`);
+        }
+      }
+
       // 다음 모델이 남아 있으면 경고 후 재시도
-      if (i < models.length - 1) {
+      if (i < queue.length - 1) {
         console.warn(
-          `[Gemini] '${model}' 한도/오류(status ${status}) → 다음 모델 '${models[i + 1]}'(으)로 폴백합니다.`,
+          `[Gemini] '${model}' 한도/오류(status ${status}) → 다음 모델 '${queue[i + 1]}'(으)로 폴백합니다.`,
         );
         continue;
       }

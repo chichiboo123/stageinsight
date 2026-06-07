@@ -1,44 +1,37 @@
 /**
- * AIStatusBadge — "현재 어떤 AI 모델을 쓰는지"를 배터리처럼 보여주는 표시기
+ * AIStatusBadge — "방금 어떤 AI 모델이 호출됐는지"를 보여주는 표시기
  * ────────────────────────────────────────────────────────────
  * - 전역 aiStatus 스토어를 구독한다.
- * - 배터리 눈금(3칸)이 모델 우선순위를 의미한다:
- *     · 1순위(gemini-2.5-flash)      → 3칸(가득) · 초록
- *     · 2순위(gemini-3.1-flash-lite) → 2칸 · 노랑 (폴백 발생)
- *     · 3순위(gemini-2.5-flash-lite) → 1칸 · 주황 (최종 폴백)
- * - 호출 중에는 점멸 표시, 실패 시 빨강으로 안내한다.
+ * - 항상 "같은 모양"의 AI 아이콘(✦ 스파클)을 쓰고, 색만 모델에 따라 다르게 칠한다.
+ *     · 모델마다 고유 색 → 어떤 모델이 호출됐는지 색으로 구분(배터리 눈금 아님).
+ * - 모델 이름은 서버가 돌려준 실제 모델 ID를 그대로 정확히 표시한다.
+ * - 호출 중에는 아이콘이 점멸, 실패 시 빨강으로 안내한다.
  * - 한 번도 호출되지 않은 idle 상태에서는 숨긴다.
  */
 
-import { useAIStatus, tierOf, MAX_TIER } from '../../services/aiStatus';
-
-// 모델 ID → 사용자용 짧은 이름
-const MODEL_LABEL: Record<string, string> = {
-  'gemini-2.5-flash': '2.5 Flash',
-  'gemini-3.1-flash-lite': '3.1 Flash-Lite',
-  'gemini-2.5-flash-lite': '2.5 Flash-Lite',
-};
+import { useAIStatus, modelColor, modelLabel } from '../../services/aiStatus';
 
 export function AIStatusBadge() {
   const status = useAIStatus();
   if (status.phase === 'idle') return null;
 
-  const tier = tierOf(status.model);
-  const filled = tier === 0 ? MAX_TIER : MAX_TIER - tier + 1; // 1순위=3칸 … 3순위=1칸
+  const calling = status.phase === 'calling';
+  const error = status.phase === 'error';
 
-  let color = '#22c55e';        // 1순위(초록)
-  if (tier === 2) color = '#eab308';   // 2순위(노랑)
-  else if (tier >= 3) color = '#f97316'; // 3순위(주황)
+  // 색: 호출 중=중립 파랑, 실패=빨강, 성공=모델별 고유 색
+  let color = modelColor(status.model);
+  if (calling) color = '#3b82f6';
+  else if (error) color = '#ef4444';
 
   let text: string;
-  if (status.phase === 'calling') { text = '호출 중…'; color = '#3b82f6'; }
-  else if (status.phase === 'error') { text = 'AI 오류'; color = '#ef4444'; }
-  else text = status.model ? (MODEL_LABEL[status.model] ?? status.model) : 'AI';
+  if (calling) text = '호출 중…';
+  else if (error) text = 'AI 오류';
+  else text = modelLabel(status.model);
 
   const tooltip =
-    status.phase === 'calling' ? `AI ${status.label ?? ''} 처리 중`
-    : status.phase === 'error' ? `AI 호출 실패 (${status.label ?? ''})`
-    : `사용 모델: ${status.model ?? '알 수 없음'} · 우선순위 ${tier}순위\n(폴백 시 자동으로 다른 무료 모델로 전환됩니다)`;
+    calling ? `AI ${status.label ?? ''} 처리 중`
+    : error ? `AI 호출 실패 (${status.label ?? ''})`
+    : `호출된 모델: ${status.model ?? '알 수 없음'}\n(한도 초과 시 자동으로 다른 무료 모델로 전환되며, 이 색/이름이 실제 사용된 모델입니다)`;
 
   return (
     <div
@@ -53,18 +46,18 @@ export function AIStatusBadge() {
         whiteSpace: 'nowrap',
       }}
     >
-      {/* 배터리 아이콘 */}
-      <svg width="22" height="13" viewBox="0 0 22 13" aria-hidden="true">
-        <rect x="0.5" y="0.5" width="18" height="12" rx="2.5" fill="none" stroke={color} strokeWidth="1" />
-        <rect x="19.5" y="4" width="2" height="5" rx="1" fill={color} />
-        {[0, 1, 2].map(i => (
-          <rect
-            key={i}
-            x={2.5 + i * 5.3} y={2.5} width="4.3" height="8" rx="1"
-            fill={i < filled ? color : 'transparent'}
-            opacity={status.phase === 'calling' ? 0.5 : 1}
-          />
-        ))}
+      {/* AI 아이콘 — 모든 모델에서 동일한 모양(✦ 스파클), 색만 모델에 따라 달라진다 */}
+      <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 1.5 L14 9.2 L21.8 11.2 L14 13.2 L12 21.0 L10 13.2 L2.2 11.2 L10 9.2 Z"
+          fill={color}
+        >
+          {calling && (
+            <animate attributeName="opacity" values="1;0.35;1" dur="1s" repeatCount="indefinite" />
+          )}
+        </path>
+        {/* 작은 보조 스파클 — 모양 일관성을 위해 고정 */}
+        <path d="M19 2.5 L19.7 5 L22.2 5.7 L19.7 6.4 L19 8.9 L18.3 6.4 L15.8 5.7 L18.3 5 Z" fill={color} opacity="0.55" />
       </svg>
       <span>{text}</span>
     </div>
