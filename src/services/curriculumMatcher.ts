@@ -149,13 +149,17 @@ function computeScore(
 }
 
 // ---------- AI 후보 풀 ----------
-// 키워드 점수 상위 후보를 학년군 다양성과 함께 추려 AI 재정렬에 전달한다.
+// AI가 "폭넓은" 성취기준을 참고해 큐레이션하도록 후보 풀을 구성한다.
+//  1) 키워드 점수 상위 후보를 학년군·교과 다양성을 함께 적용해 추리고,
+//  2) 남는 자리는 여러 교과·학년군을 고르게 포함하는 "다양성 채움"으로 메운다.
+// → 매번 예술·음악 성취기준만 반복 추천되던 문제를 줄이고, 작품과 의미적으로
+//   연결될 수 있는 다양한 교과(국어·사회·도덕·과학·미술 등)를 AI가 참고하게 한다.
 // (전체 3,373건을 LLM에 넣지 않고 소량만 보내 토큰을 절약한다)
 export async function getCandidatePool(
   keywords: string[],
   synopsis: string,
   filterTypes?: CurriculumType[],
-  poolSize = 40,
+  poolSize = 60,
 ): Promise<AchievementStandard[]> {
   const db = await getDB();
   const filtered = filterTypes && filterTypes.length > 0
@@ -173,18 +177,58 @@ export async function getCandidatePool(
     .filter(m => m.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  // 학년군 다양성: 학년군당 최대 8개까지 허용하며 poolSize까지 채움
-  const GRADE_CAP = 8;
+  // 다양성: 한 학년군·한 교과가 풀을 독점하지 않도록 캡을 함께 적용한다.
+  const GRADE_CAP = 14;
+  const SUBJECT_CAP = 8;
   const gradeCount = new Map<string, number>();
+  const subjectCount = new Map<string, number>();
+  const chosen = new Set<string>();
   const pool: AchievementStandard[] = [];
+
+  // 1단계: 키워드 점수 상위 후보(교과·학년군 캡 적용)
   for (const m of scored) {
-    const g = m.standard.grade ?? '기타';
-    const cnt = gradeCount.get(g) ?? 0;
-    if (cnt >= GRADE_CAP) continue;
-    pool.push(m.standard);
-    gradeCount.set(g, cnt + 1);
     if (pool.length >= poolSize) break;
+    const g = m.standard.grade ?? '기타';
+    const subj = m.standard.subject ?? '기타';
+    if ((gradeCount.get(g) ?? 0) >= GRADE_CAP) continue;
+    if ((subjectCount.get(subj) ?? 0) >= SUBJECT_CAP) continue;
+    pool.push(m.standard);
+    chosen.add(m.standard.id);
+    gradeCount.set(g, (gradeCount.get(g) ?? 0) + 1);
+    subjectCount.set(subj, (subjectCount.get(subj) ?? 0) + 1);
   }
+
+  // 2단계: 다양성 채움 — 남는 자리를 여러 교과에 걸쳐 라운드로빈으로 메운다.
+  //   (키워드 일치가 없어도 AI가 의미적으로 연결할 수 있는 폭넓은 후보를 제공)
+  if (pool.length < poolSize) {
+    const bySubject = new Map<string, AchievementStandard[]>();
+    for (const s of filtered) {
+      if (chosen.has(s.id)) continue;
+      const list = bySubject.get(s.subject) ?? [];
+      list.push(s);
+      bySubject.set(s.subject, list);
+    }
+    // 교과는 후보 수가 적은 순으로 돌며 소수 교과도 대표 후보가 포함되게 한다.
+    const subjects = [...bySubject.keys()].sort(
+      (a, b) => (bySubject.get(a)!.length) - (bySubject.get(b)!.length),
+    );
+    const cursor = new Map<string, number>();
+    let progressed = true;
+    while (pool.length < poolSize && progressed) {
+      progressed = false;
+      for (const subj of subjects) {
+        if (pool.length >= poolSize) break;
+        const list = bySubject.get(subj)!;
+        const idx = cursor.get(subj) ?? 0;
+        if (idx >= list.length) continue;
+        pool.push(list[idx]);
+        chosen.add(list[idx].id);
+        cursor.set(subj, idx + 1);
+        progressed = true;
+      }
+    }
+  }
+
   return pool;
 }
 

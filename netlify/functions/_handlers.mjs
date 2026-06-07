@@ -142,6 +142,12 @@ export async function lessonIdeas(body, apiKey) {
   const movies = (Array.isArray(body?.movies) ? body.movies : []).slice(0, 6).map(m => String(m).slice(0, 60));
   const books = (Array.isArray(body?.books) ? body.books : []).slice(0, 6).map(b => String(b).slice(0, 60));
 
+  // ── 선택 입력(맞춤형 옵션): 있으면 수업 설계를 더 구체적으로 조정한다 ──
+  const audiences = (Array.isArray(body?.audiences) ? body.audiences : [])
+    .slice(0, 6).map(a => String(a).slice(0, 20)).filter(Boolean);
+  const direction = String(body?.direction ?? '').slice(0, 300).trim();
+  const focusSubject = String(body?.focusSubject ?? '').slice(0, 100).trim();
+
   // ① 줄거리 확보: KOPIS 줄거리가 충분하면 추가 호출 없이 그대로 사용하고,
   //    비어 있거나 빈약할 때만 웹 검색 그라운딩을 1회 수행한다(AI 호출 절감).
   const synopsisLen = synopsis.replace(/\s/g, '').length;
@@ -167,6 +173,12 @@ export async function lessonIdeas(body, apiKey) {
     '④ 융합 수업 설계: 공연을 중심에 두고 연계 영화·도서를 매체로 엮어 하나의 흐름이 있는 수업' +
     '(공연 감상 → 매체 연계 → 표현·창작 활동)을 설계한다. 성취기준의 학년 수준에 맞춰 난이도를 조정하고, ' +
     '한국 교실에서 바로 적용 가능하게 쓴다. 영화·도서는 공연 주제를 확장·심화하는 연결고리로 구체적으로 활용한다.\n' +
+    '⑤ 맞춤 옵션 반영: 교사가 "수업옵션"을 제공한 경우 반드시 우선 반영한다. ' +
+    '"수업대상"이 있으면 해당 발달단계·연령에 맞춰 활동 난이도·어휘·발문·활동시간을 조정하고 ' +
+    'gradeBand에 그 대상을 명시한다(여러 대상이면 함께 고려). ' +
+    '"수업방향/키워드"가 있으면 그 의도·주제·핵심 키워드가 수업 전반(목표·활동·발문)에 드러나게 한다. ' +
+    '"주요교과"가 있으면 그 교과의 성취·개념·활동을 수업의 중심 축으로 삼아 설계한다. ' +
+    '옵션이 비어 있으면 성취기준·작품 특성으로 합리적으로 판단한다.\n' +
     '모든 내용은 과장 없이 신뢰성 있게 작성한다.';
 
   const user = JSON.stringify({
@@ -180,6 +192,11 @@ export async function lessonIdeas(body, apiKey) {
     성취기준: standards,
     연계영화: movies,
     연계도서: books,
+    수업옵션: {
+      수업대상: audiences,            // 비어 있으면 자동 판단
+      수업방향_키워드: direction,     // 서술형(선택)
+      주요교과: focusSubject,         // 서술형(선택)
+    },
   });
 
   const schema = {
@@ -189,6 +206,7 @@ export async function lessonIdeas(body, apiKey) {
       plotSummary: { type: T.STRING },           // ① 작품 줄거리·핵심 내용 (KOPIS 없으면 AI 지식 기반)
       workSummary: { type: T.STRING },           // ② 작품 기본 정보(사실) 요약
       learningValue: { type: T.ARRAY, items: { type: T.STRING } }, // ③ 이 작품으로 가능한 학습(종합)
+      gradeBand: { type: T.STRING },             // 수업 대상(학년/연령) — 옵션 반영
       overview: { type: T.STRING },              // 수업 개요(2~3문장)
       convergenceFocus: { type: T.STRING },      // 공연·영화·도서를 잇는 융합 포인트
       objectives: { type: T.ARRAY, items: { type: T.STRING } },
@@ -222,6 +240,7 @@ export async function lessonIdeas(body, apiKey) {
     plotSummary: groundedPlot || (json?.plotSummary ? String(json.plotSummary) : undefined),
     workSummary: json?.workSummary ? String(json.workSummary) : undefined,
     learningValue: arr(json?.learningValue, 8),
+    gradeBand: json?.gradeBand ? String(json.gradeBand).slice(0, 80) : (audiences.length ? audiences.join(', ') : undefined),
     overview: String(json?.overview ?? ''),
     convergenceFocus: json?.convergenceFocus ? String(json.convergenceFocus) : undefined,
     objectives: (json?.objectives ?? []).map(String).slice(0, 6),
@@ -407,7 +426,7 @@ export async function curateAll(body, apiKey) {
   const keywords = (Array.isArray(performance.keywords) ? performance.keywords : [])
     .slice(0, 12).map(k => String(k).slice(0, 20));
 
-  const curriculum = (Array.isArray(body?.curriculum) ? body.curriculum : []).slice(0, 40).map(c => ({
+  const curriculum = (Array.isArray(body?.curriculum) ? body.curriculum : []).slice(0, 60).map(c => ({
     id: String(c.id),
     g: String(c.grade ?? '').slice(0, 20),
     s: String(c.subject ?? '').slice(0, 12),
@@ -432,8 +451,11 @@ export async function curateAll(body, apiKey) {
     '특정한 원작/배경은 sourceWork에 적는다(없거나 불확실하면 빈 문자열).\n\n' +
     '[2단계 — 주제 파악] 줄거리·원작·장르·키워드를 근거로 작품의 핵심 주제·정서·소재를 themes에 3~6개의 ' +
     '짧은 구로 적는다. (제목 표면 단어가 아니라 작품의 "내용"을 이해한다.)\n\n' +
-    '[3단계 — 성취기준] 성취기준 후보 목록에서 작품 주제와 의미적으로 연결되는 것을 선별·랭킹한다. ' +
-    '단순 단어 일치가 아니라 주제·정서·가치의 연관으로 판단하고, 특정 학년군에 치우치지 않게 다양하게 고른다. ' +
+    '[3단계 — 성취기준] 성취기준 후보 목록에서 작품 주제와 의미적으로 연결되는 것을 8~14개 선별·랭킹한다. ' +
+    '단순 단어 일치가 아니라 주제·정서·가치·소재·역량의 연관으로 폭넓게 판단한다. ' +
+    '★다양성 필수: 음악·미술 같은 예술 교과에만 치우치지 말고, 작품 내용과 연결되는 ' +
+    '국어·도덕·사회·과학·실과·체육·영어 등 여러 교과와 여러 학년군에 고르게 분포되도록 고른다. ' +
+    '같은 교과·학년군이 과도하게 반복되지 않게 한다. ' +
     '각 항목은 {id, reason(40자 이내 한국어), relevance(1~5 정수)}. 반드시 후보에 있는 id만 사용한다.\n\n' +
     '[4단계 — 영화·도서] 영화/도서 후보에서 작품 "내용"과 교육적으로 연결되는 것만 골라 {id|isbn, reason(40자 이내)}로 ' +
     '랭킹한다. 단순 제목 겹침·무관·학생 부적합 후보는 제외한다.\n\n' +
@@ -457,7 +479,7 @@ export async function curateAll(body, apiKey) {
 
   // 그라운딩 시 responseSchema 사용 불가 → 프롬프트로 JSON 유도 + 폴백 파서로 추출
   const { json, model } = await callGeminiJSON({
-    apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.3, maxOutputTokens: 2800,
+    apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.4, maxOutputTokens: 3200,
   });
 
   const validCur = new Set(curriculum.map(c => c.id));

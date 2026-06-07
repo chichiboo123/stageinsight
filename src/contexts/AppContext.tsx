@@ -21,7 +21,7 @@ type AppAction =
   | { type: 'SELECT_VENUE';  payload: Venue | null }
   | { type: 'SELECT_PERFORMANCE'; payload: Performance | null }
   | { type: 'ADD_INSIGHT_ITEM'; payload: InsightItem }
-  | { type: 'REMOVE_INSIGHT_ITEM'; payload: string }
+  | { type: 'REMOVE_INSIGHT_ITEM'; payload: { id: string; performanceId?: string } }
   | { type: 'ADD_INSIGHT_MEMO'; payload: InsightMemo }
   | { type: 'UPDATE_INSIGHT_MEMO'; payload: InsightMemo }
   | { type: 'DELETE_INSIGHT_MEMO'; payload: string }
@@ -76,8 +76,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, selectedPerformance: action.payload };
 
     case 'ADD_INSIGHT_ITEM': {
+      // 같은 항목이라도 작품(performanceId)이 다르면 별개로 담을 수 있도록
+      // 중복 판정에 performanceId를 포함한다. (작품별 독립 바구니)
       const already = state.insightBoard.items.some(
-        i => i.id === action.payload.id && i.type === action.payload.type
+        i => i.id === action.payload.id
+          && i.type === action.payload.type
+          && (i.performanceId ?? undefined) === (action.payload.performanceId ?? undefined)
       );
       if (already) return state;
       const updated = { ...state.insightBoard, items: [...state.insightBoard.items, action.payload] };
@@ -85,7 +89,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, insightBoard: updated };
     }
     case 'REMOVE_INSIGHT_ITEM': {
-      const updated = { ...state.insightBoard, items: state.insightBoard.items.filter(i => i.id !== action.payload) };
+      // 같은 id가 여러 작품에 담겨 있을 수 있으므로 performanceId까지 맞춰 해당 작품의 것만 제거한다.
+      const { id, performanceId } = action.payload;
+      const updated = {
+        ...state.insightBoard,
+        items: state.insightBoard.items.filter(
+          i => !(i.id === id && (i.performanceId ?? undefined) === (performanceId ?? undefined)),
+        ),
+      };
       saveBoard(updated);
       return { ...state, insightBoard: updated };
     }
@@ -149,7 +160,7 @@ interface AppContextValue {
   selectVenue: (venue: Venue | null) => void;
   selectPerformance: (performance: Performance | null) => void;
   addInsightItem: (item: InsightItem) => void;
-  removeInsightItem: (id: string) => void;
+  removeInsightItem: (id: string, performanceId?: string) => void;
   addInsightMemo: (content: string, performanceId?: string, performanceTitle?: string) => void;
   updateInsightMemo: (id: string, content: string) => void;
   deleteInsightMemo: (id: string) => void;
@@ -173,8 +184,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addInsightItem = useCallback((item: InsightItem) =>
     dispatch({ type: 'ADD_INSIGHT_ITEM', payload: item }), []);
-  const removeInsightItem = useCallback((id: string) =>
-    dispatch({ type: 'REMOVE_INSIGHT_ITEM', payload: id }), []);
+  const removeInsightItem = useCallback((id: string, performanceId?: string) =>
+    dispatch({ type: 'REMOVE_INSIGHT_ITEM', payload: { id, performanceId } }), []);
 
   const addInsightMemo = useCallback((content: string, performanceId?: string, performanceTitle?: string) => {
     const memo: InsightMemo = {

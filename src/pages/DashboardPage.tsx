@@ -632,11 +632,16 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
   const { selectedVenue, selectedPerformance } = state;
 
   // 바구니에 담긴 항목 집합 (담기 버튼의 '담김' 상태 표시 + 토글용)
+  // 작품별로 독립적으로 담기므로 '담김' 상태도 현재 선택된 작품(performanceId) 기준으로 판정한다.
+  const currentPerfId = selectedPerformance?.id;
   const savedKeys = useMemo(
-    () => new Set(state.insightBoard.items.map(i => `${i.type}:${i.id}`)),
+    () => new Set(state.insightBoard.items.map(i => `${i.type}:${i.id}:${i.performanceId ?? ''}`)),
     [state.insightBoard.items],
   );
-  const isSaved = useCallback((type: string, id: string) => savedKeys.has(`${type}:${id}`), [savedKeys]);
+  const isSaved = useCallback(
+    (type: string, id: string) => savedKeys.has(`${type}:${id}:${currentPerfId ?? ''}`),
+    [savedKeys, currentPerfId],
+  );
 
   const [showImageModal, setShowImageModal] = useState(false);
   const [posterModalSrc, setPosterModalSrc] = useState<string | null>(null);
@@ -968,7 +973,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         aria-pressed={isSaved('performance', displayPerformance!.id)}
                         onClick={() => {
                           if (isSaved('performance', displayPerformance!.id)) {
-                            removeInsightItem(displayPerformance!.id);
+                            removeInsightItem(displayPerformance!.id, displayPerformance!.id);
                             return;
                           }
                           const perf = buildPerformanceItem();
@@ -1281,7 +1286,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                         aria-label={isSaved('standard', standard.id) ? '인사이트 바구니에서 빼기' : '인사이트 바구니에 담기'}
                         aria-pressed={isSaved('standard', standard.id)}
                         onClick={() => isSaved('standard', standard.id)
-                          ? removeInsightItem(standard.id)
+                          ? removeInsightItem(standard.id, displayPerformance!.id)
                           : addWithPerformance({
                           type: 'standard',
                           id: standard.id,
@@ -1304,7 +1309,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                 {/* 성취기준 직접 찾기 — 추천이 놓친 성취기준도 교사가 직접 검색해 담기 */}
                 <StandardFinder
                   isSaved={isSaved}
-                  onRemove={removeInsightItem}
+                  onRemove={(id) => removeInsightItem(id, displayPerformance!.id)}
                   onAdd={(standard) => addWithPerformance({
                     type: 'standard',
                     id: standard.id,
@@ -1375,7 +1380,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           aria-pressed={isSaved('movie', String(movie.id))}
                           onClick={e => {
                             e.stopPropagation();
-                            if (isSaved('movie', String(movie.id))) { removeInsightItem(String(movie.id)); return; }
+                            if (isSaved('movie', String(movie.id))) { removeInsightItem(String(movie.id), displayPerformance!.id); return; }
                             addWithPerformance({
                               type: 'movie',
                               id: String(movie.id),
@@ -1453,7 +1458,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                           aria-pressed={isSaved('book', book.isbn)}
                           onClick={e => {
                             e.stopPropagation();
-                            if (isSaved('book', book.isbn)) { removeInsightItem(book.isbn); return; }
+                            if (isSaved('book', book.isbn)) { removeInsightItem(book.isbn, displayPerformance!.id); return; }
                             addWithPerformance({
                               type: 'book',
                               id: book.isbn,

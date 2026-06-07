@@ -32,6 +32,21 @@ const TYPE_TEXT: Record<string, string> = {
   book: '도서',
 };
 
+// AI 융합수업 설계 — 선택 입력 옵션
+const AUDIENCE_OPTIONS = ['유아', '초등 1~2학년', '초등 3~4학년', '초등 5~6학년', '중학생', '고등학생'];
+
+interface LessonOptions {
+  audiences: string[];
+  direction: string;
+  focusSubject: string;
+}
+const EMPTY_LESSON_OPTIONS: LessonOptions = { audiences: [], direction: '', focusSubject: '' };
+
+// 같은 id라도 작품(performanceId)이 다르면 별개 항목이므로 복합 키로 식별한다.
+function itemKey(item: InsightItem): string {
+  return `${item.type}:${item.id}:${item.performanceId ?? ''}`;
+}
+
 // ---------- 그룹핑 유틸 ----------
 interface PerformanceGroup {
   performanceId: string | null;
@@ -421,6 +436,7 @@ function metaToRows(meta: InsightPerformanceMeta | null | undefined): Array<{ la
 function lessonPlanToText(plan: LessonPlan, performanceTitle: string, meta?: InsightPerformanceMeta | null): string {
   const lines: string[] = [];
   lines.push(`✨ AI 융합예술 수업 — ${plan.title || performanceTitle}`);
+  if (plan.gradeBand) lines.push(`🎯 수업 대상: ${plan.gradeBand}`);
   lines.push('');
   // 작품 줄거리
   if (plan.plotSummary) {
@@ -466,19 +482,104 @@ function lessonPlanToText(plan: LessonPlan, performanceTitle: string, meta?: Ins
 }
 
 // ---------- AI 수업 아이디어 모달 ----------
+// 수업 옵션 입력 폼 (수업 대상 중복선택 · 수업 방향 · 주요 교과)
+function LessonOptionsForm({
+  options, onChange,
+}: {
+  options: LessonOptions;
+  onChange: (o: LessonOptions) => void;
+}) {
+  const toggleAudience = (a: string) => {
+    onChange({
+      ...options,
+      audiences: options.audiences.includes(a)
+        ? options.audiences.filter(x => x !== a)
+        : [...options.audiences, a],
+    });
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+          수업 대상 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(중복 선택 가능 · 선택)</span>
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {AUDIENCE_OPTIONS.map(a => {
+            const on = options.audiences.includes(a);
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() => toggleAudience(a)}
+                aria-pressed={on}
+                style={{
+                  fontSize: 12.5, padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
+                  border: `1px solid ${on ? 'var(--color-accent-primary)' : 'var(--color-border)'}`,
+                  background: on ? 'var(--color-accent-primary)' : 'var(--color-bg-primary)',
+                  color: on ? '#fff' : 'var(--color-text-primary)', fontWeight: on ? 600 : 400,
+                }}
+              >
+                {on ? '✓ ' : ''}{a}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+          수업 방향 / 키워드 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(선택)</span>
+        </label>
+        <textarea
+          value={options.direction}
+          onChange={e => onChange({ ...options, direction: e.target.value })}
+          placeholder="예: 협력과 공감을 중심으로 표현 활동을 강조하고 싶어요"
+          rows={2}
+          style={{
+            width: '100%', fontSize: 13.5, padding: '8px 10px', borderRadius: 8,
+            border: '1px solid var(--color-border)', background: 'var(--color-bg-primary)',
+            color: 'var(--color-text-primary)', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+      <div>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+          주요 교과 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(선택)</span>
+        </label>
+        <input
+          type="text"
+          value={options.focusSubject}
+          onChange={e => onChange({ ...options, focusSubject: e.target.value })}
+          placeholder="예: 국어, 도덕 (중심으로 삼을 교과)"
+          style={{
+            width: '100%', fontSize: 13.5, padding: '8px 10px', borderRadius: 8,
+            border: '1px solid var(--color-border)', background: 'var(--color-bg-primary)',
+            color: 'var(--color-text-primary)', fontFamily: 'inherit', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function LessonPlanModal({
-  performanceTitle, plan, meta, loading, error, onClose, onSaveMemo, onRegenerate,
+  performanceTitle, plan, meta, loading, error, options, onOptionsChange, onGenerate, onClose, onSaveMemo, onRegenerate,
 }: {
   performanceTitle: string;
   plan: LessonPlan | null;
   meta: InsightPerformanceMeta | null;
   loading: boolean;
   error: string | null;
+  options: LessonOptions;
+  onOptionsChange: (o: LessonOptions) => void;
+  onGenerate: () => void;
   onClose: () => void;
   onSaveMemo: () => void;
   onRegenerate: () => void;
 }) {
   const infoRows = metaToRows(meta);
+  // 옵션 입력 단계: 아직 결과가 없고 로딩 중이 아닐 때(에러 시에도 폼을 노출해 다시 시도 가능)
+  const inputPhase = !plan && !loading;
+  const [optionsExpanded, setOptionsExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     if (!plan) return;
@@ -515,6 +616,20 @@ function LessonPlanModal({
           <button className="btn btn-ghost" onClick={onClose} style={{ fontSize: '20px', padding: '4px 10px' }} aria-label="닫기">×</button>
         </div>
 
+        {/* 옵션 입력 단계 — 선택 입력 후 생성 */}
+        {inputPhase && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+              아래 옵션을 입력하면 더 맞춤형으로 설계됩니다. 비워 두면 담긴 성취기준·작품 특성으로 자동 설계합니다.
+            </p>
+            <LessonOptionsForm options={options} onChange={onOptionsChange} />
+            <button className="btn btn-primary" onClick={onGenerate} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>auto_awesome</span>
+              수업 설계 생성
+            </button>
+          </div>
+        )}
+
         {loading && (
           <p style={{ padding: '24px 0', textAlign: 'center', color: 'var(--color-text-muted)' }}>
             공연을 중심으로 영화·도서를 엮은 융합 수업을 구성하고 있어요… ⏳
@@ -528,6 +643,11 @@ function LessonPlanModal({
 
         {plan && !loading && (
           <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
+            {plan.gradeBand && (
+              <div style={{ marginBottom: 10 }}>
+                <span className="tag" style={{ fontSize: 12, background: 'rgba(107,138,253,0.15)' }}>🎯 수업 대상: {plan.gradeBand}</span>
+              </div>
+            )}
             {/* ① 작품 줄거리 (KOPIS 줄거리 또는 AI 지식 기반) */}
             {plan.plotSummary && (
               <div style={{
@@ -615,8 +735,30 @@ function LessonPlanModal({
               </>
             )}
 
+            {/* 옵션 수정 후 다시 생성 */}
+            <div style={{ marginTop: 18, border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => setOptionsExpanded(v => !v)}
+                aria-expanded={optionsExpanded}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  gap: 8, padding: '10px 14px', background: 'var(--color-bg-secondary)', border: 'none',
+                  cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
+                }}
+              >
+                <span>⚙️ 수업 옵션 {options.audiences.length || options.direction.trim() || options.focusSubject.trim() ? '(적용됨)' : '(선택)'} — 수정 후 다시 생성</span>
+                <span aria-hidden="true">{optionsExpanded ? '▲' : '▼'}</span>
+              </button>
+              {optionsExpanded && (
+                <div style={{ padding: 14 }}>
+                  <LessonOptionsForm options={options} onChange={onOptionsChange} />
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
-              <button className="btn btn-outline" onClick={onRegenerate} title="캐시를 무시하고 새로운 수업안을 생성합니다." style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button className="btn btn-outline" onClick={onRegenerate} title="현재 옵션으로 새로운 수업안을 생성합니다." style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>refresh</span>
                 다시 생성
               </button>
@@ -663,8 +805,29 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     setViewMode(mode);
     try { localStorage.setItem('stageinsight-insight-view', mode); } catch { /* ignore */ }
   }, []);
-  // 접힌 공연 그룹 key 집합 (기본: 모두 펼침)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // 접힌 공연 그룹 key 집합 (기본: 모두 접힘 — 바구니를 한눈에 보기 위함)
+  const groupKeysOf = useCallback((board: InsightBoard): Set<string> => {
+    const keys = new Set<string>();
+    for (const it of board.items) keys.add(it.performanceId ?? 'ungrouped');
+    for (const m of board.memos) keys.add(m.performanceId ?? 'ungrouped');
+    return keys;
+  }, []);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => groupKeysOf(insightBoard));
+  // 이미 한 번 본 그룹 key (새로 생긴 그룹만 기본 접힘 처리하기 위함)
+  const seenGroupKeys = useRef<Set<string>>(new Set(groupKeysOf(insightBoard)));
+  // 세션 중 새로 추가된 공연 그룹도 기본은 접힌 상태로 둔다(사용자 토글은 보존).
+  useEffect(() => {
+    const current = groupKeysOf(insightBoard);
+    const fresh = [...current].filter(k => !seenGroupKeys.current.has(k));
+    if (fresh.length > 0) {
+      setCollapsed(prev => {
+        const next = new Set(prev);
+        fresh.forEach(k => next.add(k));
+        return next;
+      });
+      fresh.forEach(k => seenGroupKeys.current.add(k));
+    }
+  }, [insightBoard, groupKeysOf]);
   const toggleCollapse = useCallback((key: string) => {
     setCollapsed(prev => {
       const next = new Set(prev);
@@ -705,20 +868,36 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
   const [lessonMeta, setLessonMeta] = useState<InsightPerformanceMeta | null>(null);
   const [lessonLoading, setLessonLoading] = useState(false);
   const [lessonError, setLessonError] = useState<string | null>(null);
+  // 선택 입력 옵션 (수업 대상·방향·주요교과)
+  const [lessonOptions, setLessonOptions] = useState<LessonOptions>(EMPTY_LESSON_OPTIONS);
   // 재생성을 위해 현재 모달이 다루는 그룹을 보관
   const lessonGroupRef = useRef<PerformanceGroup | null>(null);
 
-  const handleGenerateLesson = useCallback(async (group: PerformanceGroup, force = false) => {
+  // 설계 버튼 → 옵션 입력 단계로 모달을 연다(즉시 생성하지 않음).
+  const openLessonDesigner = useCallback((group: PerformanceGroup) => {
     const title = group.performanceTitle ?? '공연 미지정';
     const perfItem = group.items.find(i => i.type === 'performance');
     const meta = perfItem?.meta ?? null;
     lessonGroupRef.current = group;
 
-    setLessonOpen(true);
     setLessonTitle(title);
     setLessonPerfId(group.performanceId);
-    setLessonPlan(null);
     setLessonMeta(meta);
+    setLessonPlan(null);
+    setLessonError(null);
+    setLessonLoading(false);
+    setLessonOptions(EMPTY_LESSON_OPTIONS);
+    setLessonOpen(true);
+  }, []);
+
+  const handleGenerateLesson = useCallback(async (force = false) => {
+    const group = lessonGroupRef.current;
+    if (!group) return;
+    const title = group.performanceTitle ?? '공연 미지정';
+    const perfItem = group.items.find(i => i.type === 'performance');
+    const meta = perfItem?.meta ?? null;
+
+    setLessonPlan(null);
     setLessonError(null);
     setLessonLoading(true);
 
@@ -731,6 +910,10 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     const movies = group.items.filter(i => i.type === 'movie').map(i => i.title);
     const books = group.items.filter(i => i.type === 'book').map(i => i.title);
     const synopsis = perfItem?.detail ?? '';
+
+    // 옵션을 캐시 키에 반영해 옵션이 바뀌면 새로 생성되게 한다.
+    const opt = lessonOptions;
+    const optKey = `a${opt.audiences.join('+')}|d${opt.direction.trim()}|s${opt.focusSubject.trim()}`;
 
     try {
       const plan = await aiLessonIdeas({
@@ -747,7 +930,10 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
         standards,
         movies,
         books,
-        cacheKey: `${group.performanceId ?? 'none'}:${standards.map(s => s.id).join(',')}:m${movies.length}:b${books.length}`,
+        audiences: opt.audiences,
+        direction: opt.direction.trim() || undefined,
+        focusSubject: opt.focusSubject.trim() || undefined,
+        cacheKey: `${group.performanceId ?? 'none'}:${standards.map(s => s.id).join(',')}:m${movies.length}:b${books.length}:${optKey}`,
         force,
       });
       setLessonPlan(plan);
@@ -760,7 +946,7 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     } finally {
       setLessonLoading(false);
     }
-  }, []);
+  }, [lessonOptions]);
 
   const handleSaveLessonMemo = useCallback(() => {
     if (!lessonPlan) return;
@@ -772,9 +958,9 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     setLessonOpen(false);
   }, [lessonPlan, lessonTitle, lessonMeta, lessonPerfId, addInsightMemo]);
 
-  // 같은 그룹으로 캐시를 무시하고 새 수업안 생성
+  // 같은 그룹으로 캐시를 무시하고 새 수업안 생성(현재 옵션 반영)
   const handleRegenerateLesson = useCallback(() => {
-    if (lessonGroupRef.current) handleGenerateLesson(lessonGroupRef.current, true);
+    if (lessonGroupRef.current) handleGenerateLesson(true);
   }, [handleGenerateLesson]);
 
   // ── 드래그 앤 드롭 ──
@@ -796,8 +982,8 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     e.preventDefault();
     if (!dragId.current || dragId.current === targetId) { setDragOverId(null); return; }
     const items = [...insightBoard.items];
-    const fromIdx = items.findIndex(i => i.id === dragId.current);
-    const toIdx = items.findIndex(i => i.id === targetId);
+    const fromIdx = items.findIndex(i => itemKey(i) === dragId.current);
+    const toIdx = items.findIndex(i => itemKey(i) === targetId);
     if (fromIdx < 0 || toIdx < 0) { setDragOverId(null); return; }
     const [moved] = items.splice(fromIdx, 1);
     items.splice(toIdx, 0, moved);
@@ -1056,7 +1242,7 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                           className="btn btn-outline"
                           style={{ fontSize: '12px', padding: '4px 10px' }}
                           title="담긴 공연·성취기준·영화·도서로 작품 줄거리부터 AI 융합예술 수업까지 설계합니다."
-                          onClick={e => { e.stopPropagation(); handleGenerateLesson(group); }}
+                          onClick={e => { e.stopPropagation(); openLessonDesigner(group); }}
                         >
                           <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '14px' }}>auto_awesome</span>
                           AI 융합수업 설계
@@ -1069,14 +1255,16 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                   {/* 아이템 그리드 */}
                   {group.items.length > 0 && (
                     <div className={styles.itemGrid}>
-                      {group.items.map((item: InsightItem) => (
+                      {group.items.map((item: InsightItem) => {
+                        const key = itemKey(item);
+                        return (
                         <div
-                          key={item.id}
-                          className={`card ${styles.insightItem} ${dragOverId === item.id ? styles.dragOver : ''}`}
+                          key={key}
+                          className={`card ${styles.insightItem} ${dragOverId === key ? styles.dragOver : ''}`}
                           draggable
-                          onDragStart={e => handleDragStart(e, item.id)}
-                          onDragOver={e => handleDragOver(e, item.id)}
-                          onDrop={e => handleDrop(e, item.id)}
+                          onDragStart={e => handleDragStart(e, key)}
+                          onDragOver={e => handleDragOver(e, key)}
+                          onDrop={e => handleDrop(e, key)}
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedItem(item)}
                         >
@@ -1102,13 +1290,14 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
                           </div>
                           <button
                             className={styles.removeBtn}
-                            onClick={e => { e.stopPropagation(); removeInsightItem(item.id); }}
+                            onClick={e => { e.stopPropagation(); removeInsightItem(item.id, item.performanceId); }}
                             aria-label={`${item.title} 삭제`}
                           >
                             ×
                           </button>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -1256,6 +1445,9 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
           meta={lessonMeta}
           loading={lessonLoading}
           error={lessonError}
+          options={lessonOptions}
+          onOptionsChange={setLessonOptions}
+          onGenerate={() => handleGenerateLesson(false)}
           onClose={() => setLessonOpen(false)}
           onSaveMemo={handleSaveLessonMemo}
           onRegenerate={handleRegenerateLesson}
