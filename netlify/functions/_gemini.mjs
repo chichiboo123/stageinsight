@@ -17,23 +17,30 @@
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
- * 기본 모델 우선순위 체인 (앞에서부터 시도)
- *  1순위: gemini-2.5-flash       — 품질 우선(무료 티어)
- *  2순위: gemini-2.5-flash-lite  — 1순위 한도 초과 시 폴백(무료 티어)
- * 두 모델 모두 thinkingBudget=0으로 '사고(thinking)' 토큰을 꺼서
+ * 기본 모델 우선순위 체인 (앞에서부터 시도) — 2026년 6월 기준
+ *  1순위: gemini-3.1-flash-lite  — 무료 티어 일일 호출 한도가 가장 높음(최우선)
+ *  2순위: gemini-3.5-flash       — 신형 Flash(품질)
+ *  3순위: gemini-3-flash-preview — Gemini 3 Flash(프리뷰)
+ *  4순위: gemini-2.5-flash       — 검증된 안정 모델(폴백)
+ *  5순위: gemini-2.5-flash-lite  — 검증된 안정 경량 모델(최종 폴백)
+ * 모든 모델 thinkingBudget=0으로 '사고(thinking)' 토큰을 꺼서
  * 전체 출력 토큰(maxOutputTokens)을 본문에 사용하도록 한다(아래 callOnce 참고).
  *
- * ⚠ 과거 체인의 'gemini-3.1-flash-lite'는 텍스트 생성 모델이 아니라
- *   이미지 생성 계열 명칭이어서 404를 유발했다 → 제거.
+ * ⚠ 3.x 계열(특히 -preview)은 제공사가 쿼터/이름을 자주 조정하거나 폐기할 수 있다
+ *   (예: 'gemini-3.1-flash-lite-preview'는 2026-05-25 종료). 그래서 검증된 2.5 계열을
+ *   하단 폴백으로 반드시 남겨 두고, 아래 2단계 복구 장치로 이름 변경에 대응한다.
  *
- * ★ 모델명 변경/폐기 대응 (제공사 정책으로 이름이 바뀌어도 멈추지 않게)
+ * ★ 모델명 변경/폐기/차단 대응 (제공사 정책으로 이름이 바뀌어도 멈추지 않게)
  *   1) 환경변수 GEMINI_MODELS(쉼표 구분)로 코드 수정/재배포 없이 체인을 교체할 수 있다.
- *      예) GEMINI_MODELS="gemini-2.5-flash,gemini-2.5-flash-lite"
+ *      예) GEMINI_MODELS="gemini-3.1-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite"
  *   2) 그래도 모델을 못 찾으면(404/모델 없음) 런타임에 ListModels API로
  *      "지금 계정에서 실제로 쓸 수 있는" 텍스트 생성 모델을 자동 탐색해 체인에 덧붙인다.
  *      → 하드코딩된 이름이 바뀌어도 살아있는 카탈로그에서 대체 모델을 찾아 복구한다.
  */
 const DEFAULT_MODEL_CHAIN = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
 ];
@@ -62,12 +69,13 @@ let _discoveredCache = null; // { at:number, models:string[] }
 const DISCOVERY_TTL_MS = 10 * 60 * 1000;
 
 function rankModelName(name) {
-  // 점수가 낮을수록 우선. (flash 우대, lite 후순위, 실험/프리뷰 후순위)
+  // 점수가 낮을수록 우선. 무료 티어 운영 철학에 맞춰
+  // "flash-lite(무료 한도 최대) > flash > 그 외", 안정판·최신 버전 우대.
   let score = 0;
   if (/flash/.test(name)) score -= 100;
-  if (/lite/.test(name)) score += 30;
-  if (/pro/.test(name)) score -= 50;
-  if (/(exp|preview|latest)/.test(name)) score += 10;
+  if (/lite/.test(name)) score -= 40;   // 경량 모델이 무료 일일 한도가 가장 높음 → 우선
+  if (/pro/.test(name)) score += 60;     // Pro는 유료 전환 → 후순위
+  if (/(exp|preview)/.test(name)) score += 15; // 프리뷰/실험은 불안정 → 살짝 후순위
   // 버전 숫자가 클수록(최신) 우대
   const ver = parseFloat((name.match(/(\d+(?:\.\d+)?)/) || [])[1] || '0');
   score -= ver;

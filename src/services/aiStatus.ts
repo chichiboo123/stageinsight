@@ -25,9 +25,16 @@ export interface AIStatus {
  *   모델 ID 해시로 결정적(deterministic) 색을 만들어 "이름이 바뀌어도" 안정적으로 색이 매겨진다.
  */
 const MODEL_COLORS: Record<string, string> = {
+  // 3.x 계열 (현행 우선 체인)
+  'gemini-3.1-flash-lite': '#f59e0b',  // 앰버 — 최우선(무료 한도 최대)
+  'gemini-3.5-flash': '#10b981',       // 에메랄드
+  'gemini-3-flash-preview': '#06b6d4', // 시안
+  'gemini-3-flash': '#06b6d4',         // 시안(정식 승격 대비 동일 색)
+  // 2.5 계열 (검증된 폴백)
   'gemini-2.5-flash': '#22c55e',       // 초록
   'gemini-2.5-flash-lite': '#0ea5e9',  // 하늘
   'gemini-2.5-pro': '#8b5cf6',         // 보라
+  // 구형
   'gemini-2.0-flash': '#14b8a6',       // 청록
   'gemini-1.5-flash': '#84cc16',       // 라임
   'gemini-1.5-pro': '#a855f7',         // 자주
