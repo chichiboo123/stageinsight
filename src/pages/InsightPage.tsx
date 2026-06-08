@@ -356,7 +356,7 @@ function exportAsPDF(board: InsightBoard) {
 <h1>🛒 인사이트 바구니</h1>
 <pre>${text.replace(/</g, '&lt;')}</pre>
 <footer>created by. 교육뮤지컬 꿈꾸는 치수쌤</footer>
-<script>window.onload=()=>window.print();<\/script>
+<script>window.onload=()=>window.print();</script>
 </body></html>`);
   w.document.close();
 }
