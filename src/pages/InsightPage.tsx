@@ -1042,24 +1042,33 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
       shareTimerRef.current = setTimeout(() => setShareMsg(''), ms);
     };
 
+    // 서버·브라우저·프록시가 안전하게 처리할 수 있는 URL 최대 길이
+    const MAX_SAFE_URL = 8000;
+
     // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (가장 짧음)
-    // 2) 서버 실패 시 gzip 압축 링크(?z=)로 폴백 — 긴 링크를 크게 단축
-    // 3) gzip 미지원 브라우저는 비압축 ?share= 링크 최종 폴백
-    let url: string;
     try {
       const res = await fetch('/api/share', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(insightBoard),
       });
-      if (!res.ok) throw new Error('share failed');
+      if (!res.ok) throw new Error(`share api ${res.status}`);
       const { id } = await res.json() as { id: string };
-      url = `${window.location.origin}${window.location.pathname}?s=${id}`;
+      const url = `${window.location.origin}${window.location.pathname}?s=${id}`;
+      await navigator.clipboard.writeText(url);
+      flash('✅ 공유 URL 복사됨!');
+      return;
     } catch {
-      url = await shareAsCompressedUrl(insightBoard); // 폴백: gzip 압축 링크
+      // 서버 저장 실패 → 압축 URL 폴백 시도
     }
 
+    // 2) gzip 압축 URL 폴백 — 길이 초과 시 오류 안내
     try {
+      const url = await shareAsCompressedUrl(insightBoard);
+      if (url.length > MAX_SAFE_URL) {
+        flash('❌ 데이터가 너무 많아 URL 공유가 불가능합니다. 항목을 줄인 후 다시 시도해 주세요.', 5000);
+        return;
+      }
       await navigator.clipboard.writeText(url);
       flash('✅ 공유 URL 복사됨!');
     } catch {
