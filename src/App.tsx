@@ -7,6 +7,7 @@ import { HomePage, type SearchMode } from './pages/HomePage';
 import { MapPage } from './pages/MapPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { InsightPage } from './pages/InsightPage';
+import { AdminPanel } from './components/admin/AdminPanel';
 import { decodeBoardGzip, isValidBoard } from './services/shareCodec';
 import type { School, Venue, InsightBoard, Performance, PerformanceGenre, InsightPerformanceMeta } from './types';
 
@@ -396,6 +397,9 @@ function AppInner() {
         style={{ display: 'none' }}
         onChange={handleLoadJSONFile}
       />
+
+      {/* 관리자 모드 — 좌측 하단 숨김 진입점 + 비밀번호 + 클라우드 자동 동기화 */}
+      <AdminPanel />
     </>
   );
 }

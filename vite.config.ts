@@ -4,11 +4,13 @@ import react from '@vitejs/plugin-react';
 import { aiDevPlugin } from './server/vite-plugin-ai-dev.mjs';
 // @ts-expect-error - 서버 전용 mjs 모듈 (타입 선언 불필요)
 import { shareDevPlugin } from './server/vite-plugin-share-dev.mjs';
+// @ts-expect-error - 서버 전용 mjs 모듈 (타입 선언 불필요)
+import { adminDevPlugin } from './server/vite-plugin-admin-dev.mjs';
 
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [react(), aiDevPlugin(), shareDevPlugin()],
+  plugins: [react(), aiDevPlugin(), shareDevPlugin(), adminDevPlugin()],
   server: {
     proxy: {
       // KOPIS 포스터 이미지 CORS 우회 (개발 환경) — 더 구체적인 경로를 먼저 둔다
