@@ -7,7 +7,8 @@
 export function shareDevPlugin() {
   const store = new Map();
   const genId = () =>
-    Math.random().toString(36).slice(2, 6) + Math.random().toString(36).slice(2, 6);
+    Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 7);
+  const isValidId = id => /^[a-z0-9]{8,16}$/.test(id);
 
   return {
     name: 'share-dev-middleware',
@@ -22,7 +23,8 @@ export function shareDevPlugin() {
         if (req.method === 'GET') {
           const url = new URL(req.url, 'http://localhost');
           const id = url.searchParams.get('id');
-          const board = id && store.get(id);
+          if (!id || !isValidId(id)) return send(400, { error: 'invalid id' });
+          const board = store.get(id);
           if (!board) return send(404, { error: 'not found' });
           return send(200, board);
         }
@@ -37,7 +39,8 @@ export function shareDevPlugin() {
             if (!board || !Array.isArray(board.items) || !Array.isArray(board.memos)) {
               return send(400, { error: 'invalid board' });
             }
-            const id = genId();
+            let id = genId();
+            while (store.has(id)) id = genId();
             store.set(id, { items: board.items, memos: board.memos });
             send(200, { id });
           });

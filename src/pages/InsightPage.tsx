@@ -1042,8 +1042,9 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
       shareTimerRef.current = setTimeout(() => setShareMsg(''), ms);
     };
 
-    // 서버·브라우저·프록시가 안전하게 처리할 수 있는 URL 최대 길이
-    const MAX_SAFE_URL = 8000;
+    // HTTP 414를 피하려고 공유 URL 폴백은 보수적으로 제한한다.
+    // 서버 저장 단축링크(?s=)가 기본 경로이며, 긴 데이터를 쿼리스트링에 싣지 않는다.
+    const MAX_SAFE_URL = 1900;
 
     // 1) 서버에 저장해 짧은 ?s=<id> 링크 생성 (가장 짧음)
     try {
@@ -1056,17 +1057,18 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
       const { id } = await res.json() as { id: string };
       const url = `${window.location.origin}${window.location.pathname}?s=${id}`;
       await navigator.clipboard.writeText(url);
-      flash('✅ 공유 URL 복사됨!');
+      flash('✅ 단축 공유 URL 복사됨!');
       return;
     } catch {
       // 서버 저장 실패 → 압축 URL 폴백 시도
     }
 
-    // 2) gzip 압축 URL 폴백 — 길이 초과 시 오류 안내
+    // 2) 서버가 일시적으로 실패한 경우에만 짧은 gzip URL을 폴백으로 허용한다.
+    // 긴 압축 URL은 일부 기기/프록시에서 HTTP 414를 만들 수 있으므로 복사하지 않는다.
     try {
       const url = await shareAsCompressedUrl(insightBoard);
       if (url.length > MAX_SAFE_URL) {
-        flash('❌ 데이터가 너무 많아 URL 공유가 불가능합니다. 항목을 줄인 후 다시 시도해 주세요.', 5000);
+        flash('❌ 단축링크 저장에 실패했습니다. 잠시 후 다시 시도하거나 JSON 저장을 사용해 주세요.', 6000);
         return;
       }
       await navigator.clipboard.writeText(url);
