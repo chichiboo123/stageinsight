@@ -31,8 +31,10 @@ async function fetchGroundedPlot(apiKey, { title, genre, venue, period, synopsis
       이공연: { 제목: title, 장르: genre, 공연장: venue, 공연기간: period },
       KOPIS_줄거리: String(synopsis ?? '').slice(0, 700),
     });
+    // 이 그라운딩 호출 뒤에 lessonIdeas 본 호출이 이어지므로, 둘의 합이 함수 실행
+    // 한도를 넘지 않도록 예산을 짧게 준다(초과 시 ''를 반환해 우아하게 폴백).
     const { json } = await callGeminiJSON({
-      apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.3, maxOutputTokens: 1200,
+      apiKey, system, user, tools: SEARCH_TOOL, temperature: 0.3, maxOutputTokens: 1200, deadlineMs: 4500,
     });
     return String(json?.plot ?? '').trim();
   } catch {

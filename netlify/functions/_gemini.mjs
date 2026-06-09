@@ -17,6 +17,14 @@
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 /**
+ * 전체 시간 예산(ms) — Netlify 동기 함수 기본 실행 한도(10초)보다 낮게 잡아,
+ * 함수가 강제 종료(opaque 504)되기 전에 우리가 우아하게 결과/오류를 반환하도록 한다.
+ * 더 긴 타임아웃을 쓰는 플랜이면 환경변수 AI_DEADLINE_MS로 올릴 수 있다(예: 24000).
+ */
+const DEFAULT_DEADLINE_MS =
+  (typeof process !== 'undefined' && Number(process.env?.AI_DEADLINE_MS)) || 9000;
+
+/**
  * 기본 모델 우선순위 체인 (앞에서부터 시도) — 2026년 6월 기준
  *  1순위: gemini-3.1-flash-lite  — 무료 티어 일일 호출 한도가 가장 높음(최우선)
  *  2순위: gemini-3.5-flash       — 신형 Flash(품질)
@@ -82,13 +90,20 @@ function rankModelName(name) {
   return score;
 }
 
-export async function discoverGenerateContentModels(apiKey) {
+export async function discoverGenerateContentModels(apiKey, timeoutMs = 2500) {
   if (!apiKey) return [];
   if (_discoveredCache && Date.now() - _discoveredCache.at < DISCOVERY_TTL_MS) {
     return _discoveredCache.models;
   }
   try {
-    const res = await fetch(`${API_BASE}?key=${apiKey}&pageSize=200`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(800, timeoutMs));
+    let res;
+    try {
+      res = await fetch(`${API_BASE}?key=${apiKey}&pageSize=200`, { signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) return [];
     const data = await res.json();
     const models = (Array.isArray(data?.models) ? data.models : [])
@@ -127,10 +142,12 @@ export class GeminiError extends Error {
  *    (502는 연결 실패·빈 응답·JSON 파싱 실패 등 우리 내부 오류 표기에도 쓰이며,
  *     다른 모델은 정상 JSON을 줄 수 있으므로 반드시 폴백 대상에 포함한다.)
  *  - 403/404: 해당 모델 사용 불가/미존재 → 다른 모델로 전환
+ *  - 504: 호출당 타임아웃(주로 느린 그라운딩) → 더 빠른 다음 시도(비그라운딩)로 전환
  *  - 400/401: 요청 형식 오류·인증 실패 → 모델을 바꿔도 동일하게 실패하므로 즉시 중단
  */
 function isFallbackWorthy(status) {
-  return status === 429 || status === 500 || status === 502 || status === 503 || status === 403 || status === 404;
+  return status === 429 || status === 500 || status === 502 || status === 503
+    || status === 403 || status === 404 || status === 504;
 }
 
 /**
@@ -158,7 +175,7 @@ function thinkingConfigFor(model, budget = 0) {
  * 단일 모델로 generateContent를 1회 호출한다 (내부 함수).
  * 성공 시 파싱된 JSON 객체를 반환하고, 실패 시 GeminiError를 throw 한다.
  */
-async function callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget = 0, tools = null }) {
+async function callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget = 0, tools = null, timeoutMs = 8000 }) {
   const grounded = Array.isArray(tools) && tools.length > 0;
   const body = {
     contents: [{ role: 'user', parts: [{ text: user }] }],
@@ -178,16 +195,26 @@ async function callOnce({ apiKey, model, system, user, schema, temperature, maxO
   if (grounded) body.tools = tools;
   if (system) body.systemInstruction = { parts: [{ text: system }] };
 
+  // 호출당 타임아웃: 멈춘/느린 호출이 함수 전체 실행 한도까지 매달려
+  // Netlify가 강제 종료(opaque 504)하는 것을 막는다. 초과 시 504로 폴백 유도.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, timeoutMs));
   let res;
   try {
     res = await fetch(`${API_BASE}/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
   } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new GeminiError(`Gemini 호출 시간 초과(${timeoutMs}ms)`, 504);
+    }
     // 네트워크 자체 실패 → 폴백 가치가 있다고 보고 502로 표시
     throw new GeminiError(`Gemini 연결 실패: ${err?.message ?? err}`, 502);
+  } finally {
+    clearTimeout(timer);
   }
 
   if (!res.ok) {
@@ -244,23 +271,53 @@ export async function callGeminiJSON({
   maxOutputTokens = 1024,
   thinkingBudget = 0,
   tools = null,
+  deadlineMs = DEFAULT_DEADLINE_MS,
 }) {
   if (!apiKey) {
     throw new GeminiError('GEMINI_API_KEY가 설정되지 않았습니다.', 503);
   }
 
+  const start = Date.now();
+  const remaining = () => deadlineMs - (Date.now() - start);
+  const MIN_ATTEMPT_MS = 1500; // 남은 예산이 이보다 적으면 새 시도를 시작하지 않는다
+
+  const grounded = Array.isArray(tools) && tools.length > 0;
+
+  // ★ 시도 계획
+  //  - 그라운딩 핸들러: Google 검색은 느려 504/502를 유발하므로, 1순위 모델에서만
+  //    "그라운딩 1회"를 시도하고 실패하면 즉시 "비그라운딩" 체인으로 강등한다.
+  //    (정확도보다 응답 보장을 우선 — 비그라운딩도 프롬프트로 충분히 좋은 결과를 낸다.)
+  //  - 비그라운딩 핸들러: 기존처럼 모델 체인을 순서대로 시도한다.
+  const queue = grounded
+    ? [{ model: models[0], grounded: true }, ...models.map(m => ({ model: m, grounded: false }))]
+    : models.map(m => ({ model: m, grounded: false }));
+
   let lastError = null;
-  // 시도 대기열(처리 중 동적으로 늘어날 수 있다 — 모델명 변경/폐기 시 자동 탐색 보강).
-  const queue = [...models];
   let discovered = false; // ListModels 자동 탐색을 1회만 수행하기 위한 가드
 
   for (let i = 0; i < queue.length; i++) {
-    const model = queue[i];
+    const rem = remaining();
+    if (rem < MIN_ATTEMPT_MS) {
+      console.warn(`[Gemini] 시간 예산 소진(${rem}ms 남음) — 추가 시도 중단`);
+      break;
+    }
+
+    const { model, grounded: attemptGrounded } = queue[i];
+    // 그라운딩(웹 검색 포함)은 더 넉넉히, 비그라운딩은 짧게 — 남은 예산으로 상한을 둔다.
+    const cap = attemptGrounded ? 6500 : 4500;
+    const timeoutMs = Math.max(1000, Math.min(cap, rem - 500));
+
     try {
-      const json = await callOnce({ apiKey, model, system, user, schema, temperature, maxOutputTokens, thinkingBudget, tools });
-      // 폴백이 발생했다면(첫 모델이 아니면) 로그로 남겨 추적 가능하게 한다.
+      const json = await callOnce({
+        apiKey, model, system, user,
+        // 그라운딩 시 responseSchema 사용 불가 → 비그라운딩 폴백에서만 스키마 적용
+        schema: attemptGrounded ? undefined : schema,
+        temperature, maxOutputTokens, thinkingBudget,
+        tools: attemptGrounded ? tools : null,
+        timeoutMs,
+      });
       if (i > 0) {
-        console.info(`[Gemini] 폴백 성공: '${model}' 사용 (시도 ${i + 1}번째)`);
+        console.info(`[Gemini] 폴백 성공: '${model}'${attemptGrounded ? ' (그라운딩)' : ' (비그라운딩)'} 사용 (시도 ${i + 1}번째)`);
       }
       return { json, model };
     } catch (err) {
@@ -275,31 +332,33 @@ export async function callGeminiJSON({
 
       // ★ 모델을 못 찾는 오류(404 등)는 "이름이 바뀌었거나 폐기됐을" 가능성이 높다.
       //   살아있는 카탈로그(ListModels)에서 실제 사용 가능한 모델을 1회 탐색해 대기열에 덧붙인다.
-      //   → 하드코딩된 모델명이 제공사 정책으로 바뀌어도 자동으로 복구된다.
-      if (status === 404 && !discovered) {
+      //   (남은 예산이 충분할 때만 — 탐색 자체도 시간을 쓰므로.)
+      if (status === 404 && !discovered && remaining() > 3000) {
         discovered = true;
-        const live = await discoverGenerateContentModels(apiKey);
-        const added = live.filter(m => !queue.includes(m));
+        const live = await discoverGenerateContentModels(apiKey, Math.min(2500, remaining() - 500));
+        const have = new Set(queue.map(q => q.model));
+        const added = live.filter(m => !have.has(m)).map(m => ({ model: m, grounded: false }));
         if (added.length) {
           queue.push(...added);
-          console.warn(`[Gemini] 모델 미존재(404) → 카탈로그에서 대체 모델 ${added.length}개 자동 보강: ${added.slice(0, 5).join(', ')}…`);
+          console.warn(`[Gemini] 모델 미존재(404) → 카탈로그에서 대체 모델 ${added.length}개 자동 보강: ${added.slice(0, 5).map(a => a.model).join(', ')}…`);
         }
       }
 
-      // 다음 모델이 남아 있으면 경고 후 재시도
-      if (i < queue.length - 1) {
+      // 다음 시도가 남아 있고 예산이 있으면 경고 후 재시도
+      if (i < queue.length - 1 && remaining() >= MIN_ATTEMPT_MS) {
+        const next = queue[i + 1];
         console.warn(
-          `[Gemini] '${model}' 한도/오류(status ${status}) → 다음 모델 '${queue[i + 1]}'(으)로 폴백합니다.`,
+          `[Gemini] '${model}' 오류(status ${status}) → 다음 시도 '${next.model}'${next.grounded ? ' (그라운딩)' : ' (비그라운딩)'}(으)로 폴백합니다.`,
         );
         continue;
       }
 
-      // 마지막 모델까지 실패
-      console.error(`[Gemini] 모든 모델 실패. 마지막 오류(status ${status}): ${err.message}`);
+      // 마지막 시도까지 실패
+      console.error(`[Gemini] 모든 시도 실패. 마지막 오류(status ${status}): ${err.message}`);
     }
   }
 
-  // 모든 모델 실패 → 사용자에게 전달할 안정적인 오류
+  // 모든 시도 실패 → 사용자에게 전달할 안정적인 오류
   throw new GeminiError(
     `모든 AI 모델 호출에 실패했습니다. (마지막 오류: ${lastError?.message ?? '알 수 없음'})`,
     lastError instanceof GeminiError ? lastError.status : 502,
