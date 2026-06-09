@@ -48,7 +48,10 @@ export const handler = async (event) => {
     // getStore() 전에 반드시 connectLambda(event)로 이벤트에서 컨텍스트를 연결해야
     // "MissingBlobsEnvironmentError" → 503 으로 떨어지지 않는다.
     connectLambda(event);
-    store = getStore(STORE);
+    // consistency: 'strong' — 기본 'eventual'은 쓰기가 모든 리전으로 전파되기 전엔
+    // 다른 리전 조회에서 null을 돌려줘 "저장 성공 후 조회 404"가 발생한다.
+    // 공유 링크는 작성 직후 다른 기기/사용자가 열기 때문에 강한 일관성이 필수다.
+    store = getStore({ name: STORE, consistency: 'strong' });
   } catch (err) {
     return {
       statusCode: 503,
@@ -64,10 +67,17 @@ export const handler = async (event) => {
     if (!ID_PATTERN.test(id)) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'invalid id' }) };
     try {
       const board = await store.get(id, { type: 'json' });
+      // null = 실제로 존재하지 않는 id → 404.
       if (!board) return { statusCode: 404, headers: cors, body: JSON.stringify({ error: 'not found' }) };
       return { statusCode: 200, headers: cors, body: JSON.stringify(board) };
-    } catch {
-      return { statusCode: 404, headers: cors, body: JSON.stringify({ error: 'not found' }) };
+    } catch (err) {
+      // Blobs 조회 자체가 실패한 경우(일관성·네트워크 등)는 404로 감추지 않고
+      // 503으로 실제 원인을 노출해 진단을 가능하게 한다.
+      return {
+        statusCode: 503,
+        headers: cors,
+        body: JSON.stringify({ error: 'store read failed', detail: String(err?.message || err) }),
+      };
     }
   }
 
