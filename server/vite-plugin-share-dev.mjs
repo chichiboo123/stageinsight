@@ -6,8 +6,13 @@
 
 export function shareDevPlugin() {
   const store = new Map();
-  const genId = () =>
-    Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 7);
+  const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const genId = () => {
+    // 운영(share.mjs)과 동일하게 항상 10자 영숫자로 생성한다.
+    let id = '';
+    for (let i = 0; i < 10; i++) id += ID_ALPHABET[Math.floor(Math.random() * ID_ALPHABET.length)];
+    return id;
+  };
   const isValidId = id => /^[a-z0-9]{8,16}$/.test(id);
 
   return {
