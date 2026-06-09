@@ -12,11 +12,14 @@
 import { getStore } from '@netlify/blobs';
 
 const STORE = 'insight-shares';
-const MAX_BYTES = 256 * 1024; // 256KB 상한 (남용 방지)
+// 긴 AI 수업 메모/여러 작품을 담아도 쿼리스트링 폴백으로 떨어지지 않도록
+// 함수 payload 한도보다 낮은 선에서 넉넉히 허용한다.
+const MAX_BYTES = 2 * 1024 * 1024; // 2MB 상한 (남용 방지)
+const ID_PATTERN = /^[a-z0-9]{8,16}$/;
 
 function genId() {
-  // 8자 영숫자 (충돌 가능성 사실상 무시 가능한 규모)
-  return Math.random().toString(36).slice(2, 6) + Math.random().toString(36).slice(2, 6);
+  // 10자 영숫자. URL은 짧게 유지하면서 충돌 가능성을 낮춘다.
+  return Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 7);
 }
 
 const cors = {
@@ -42,6 +45,7 @@ export const handler = async (event) => {
   if (event.httpMethod === 'GET') {
     const id = event.queryStringParameters?.id;
     if (!id) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'id required' }) };
+    if (!ID_PATTERN.test(id)) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'invalid id' }) };
     try {
       const board = await store.get(id, { type: 'json' });
       if (!board) return { statusCode: 404, headers: cors, body: JSON.stringify({ error: 'not found' }) };
@@ -65,13 +69,18 @@ export const handler = async (event) => {
     if (!board || !Array.isArray(board.items) || !Array.isArray(board.memos)) {
       return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'invalid board' }) };
     }
-    const id = genId();
     try {
-      await store.set(id, JSON.stringify({ items: board.items, memos: board.memos }));
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const id = genId();
+        const existing = await store.get(id);
+        if (existing) continue;
+        await store.set(id, JSON.stringify({ items: board.items, memos: board.memos }));
+        return { statusCode: 200, headers: cors, body: JSON.stringify({ id }) };
+      }
     } catch {
       return { statusCode: 503, headers: cors, body: JSON.stringify({ error: 'store failed' }) };
     }
-    return { statusCode: 200, headers: cors, body: JSON.stringify({ id }) };
+    return { statusCode: 503, headers: cors, body: JSON.stringify({ error: 'id collision' }) };
   }
 
   return { statusCode: 405, headers: cors, body: JSON.stringify({ error: 'Method Not Allowed' }) };
