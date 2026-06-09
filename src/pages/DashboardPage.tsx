@@ -628,7 +628,7 @@ function StandardFinder({
 
 // ================================================================
 export function DashboardPage({ onGoToMap }: DashboardPageProps) {
-  const { state, selectVenue, selectPerformance, addInsightItem, removeInsightItem } = useApp();
+  const { state, selectVenue, selectPerformance, addInsightItem, removeInsightItem, addInsightMemo } = useApp();
   const { selectedVenue, selectedPerformance } = state;
 
   // 바구니에 담긴 항목 집합 (담기 버튼의 '담김' 상태 표시 + 토글용)
@@ -793,6 +793,20 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
       flashIntro('⚠️ 이미지 복사 미지원 — JPG 저장을 이용하세요');
     }
   }, [intro, displayPerformance, flashIntro]);
+
+  // AI 작품 소개를 인사이트 바구니에 메모로 담는다(작품도 함께 담아 그룹을 만든다).
+  // (AI 융합수업 설계의 '메모로 저장'과 동일한 방식)
+  const handleSaveIntroToBasket = useCallback(() => {
+    if (!intro || !displayPerformance) return;
+    const perf = buildPerformanceItem();
+    if (perf) addInsightItem(perf);
+    addInsightMemo(
+      introToText(intro, displayPerformance.title),
+      displayPerformance.id,
+      displayPerformance.title,
+    );
+    flashIntro('✅ 인사이트 바구니에 담음');
+  }, [intro, displayPerformance, buildPerformanceItem, addInsightItem, addInsightMemo, flashIntro]);
 
   const availableGrades = useMemo(() => {
     const grades = [...new Set(matches.map(m => m.standard.grade))];
@@ -1009,6 +1023,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
                             <strong style={{ fontSize: 14 }}>✨ AI 작품 소개</strong>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               {introMsg && <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginRight: 2 }}>{introMsg}</span>}
+                              <button className={styles.introToolBtn} title="인사이트 바구니에 담기" aria-label="인사이트 바구니에 담기" onClick={handleSaveIntroToBasket}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>shopping_basket</span></button>
                               <button className={styles.introToolBtn} title="텍스트 클립보드 복사" aria-label="텍스트 복사" onClick={handleCopyIntroText}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>content_paste</span></button>
                               <button className={styles.introToolBtn} title="TXT 파일 다운로드" aria-label="TXT 다운로드" onClick={handleDownloadIntroTxt}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>description</span></button>
                               <button className={styles.introToolBtn} title="JPG 이미지 다운로드" aria-label="JPG 다운로드" onClick={handleDownloadIntroJpg}><span className="material-symbols-outlined" style={{ fontSize: '16px' }}>image</span></button>
