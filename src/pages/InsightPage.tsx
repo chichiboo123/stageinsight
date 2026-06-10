@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../contexts/AppContext';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import { aiLessonIdeas } from '../services/ai';
 import { encodeBoardGzip, encodeBoardBase64, supportsCompression } from '../services/shareCodec';
 import type { InsightBoard, InsightItem, InsightMemo, InsightPerformanceMeta, LessonPlan } from '../types';
@@ -356,11 +357,7 @@ function exportAsPDF(board: InsightBoard) {
 
 // ---------- 아이템 상세 팝업 ----------
 function ItemDetailModal({ item, onClose }: { item: InsightItem; onClose: () => void }) {
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
+  useModalDismiss(onClose);
 
   return (
     <div
@@ -589,11 +586,7 @@ function LessonPlanModal({
       setTimeout(() => setCopied(false), 2000);
     } catch { /* ignore */ }
   };
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
+  useModalDismiss(onClose);
 
   return (
     <div
@@ -852,6 +845,18 @@ export function InsightPage({ onBack, onOpenPerformance }: InsightPageProps) {
     setSelectedPerfId(perfId);
     setMemoModalOpen(true);
   }, []);
+  // 메모 작성 모달도 다른 모달처럼 Esc로 닫고 배경 스크롤을 잠근다.
+  useEffect(() => {
+    if (!memoModalOpen) return;
+    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') setMemoModalOpen(false); };
+    window.addEventListener('keydown', handle);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handle);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [memoModalOpen]);
   const handleCopyMemo = useCallback(async (id: string, content: string) => {
     try {
       await navigator.clipboard.writeText(content);

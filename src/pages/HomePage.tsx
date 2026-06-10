@@ -146,9 +146,12 @@ export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance, mod
               <>
                 <SearchBar value={query} onChange={setQuery} onClear={clearResults}
                   placeholder="학교 이름을 입력하세요" loading={loading} autoFocus />
-                {(schools.length > 0 || error) && (
+                {(schools.length > 0 || error || (!loading && query.trim() && schools.length === 0)) && (
                   <div className={styles.dropdown}>
                     {error && <div className={styles.dropdownError}>{error}</div>}
+                    {!error && !loading && query.trim() && schools.length === 0 && (
+                      <div className={styles.dropdownError}>검색 결과가 없습니다. 학교 이름을 다시 확인해 주세요.</div>
+                    )}
                     {schools.map(school => (
                       <button key={school.id} className={styles.dropdownItem} onClick={() => handleSchoolSelect(school)}>
                         <span className={styles.schoolIcon}>🏫</span>
@@ -216,7 +219,7 @@ export function HomePage({ onSchoolSelect, onVenueSelect, onOpenPerformance, mod
           {!venueLoading && venues.length > 0 && (
             <>
               {perfStatusLoading && (
-                <div className={styles.venueLoading}><span className={styles.spinner} /><span>공연장 검색 중...</span></div>
+                <div className={styles.venueLoading}><span className={styles.spinner} /><span>각 공연장의 현재 공연 여부 확인 중...</span></div>
               )}
               <p className={styles.venueCount}>총 {venues.length}곳 검색됨</p>
               <div className={styles.venueGrid}>

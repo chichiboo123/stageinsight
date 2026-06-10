@@ -200,6 +200,14 @@
   .logoText { font-size: 22px; }
   .logoSub  { display: none; }
   .helpBtn span, .cartBtn span { display: none; }
+  /* 텍스트는 숨겨도 담은 개수 배지는 유지 — 아이콘 위 우상단에 겹쳐 표시 */
+  .cartBtn .badge {
+    display: inline-flex;
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    border: 1.5px solid var(--color-accent-primary);
+  }
   .inner { height: 56px; }
 }
 

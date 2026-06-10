@@ -61,9 +61,11 @@ function AppInner() {
         .then((decoded: InsightBoard | null) => {
           if (decoded && Array.isArray(decoded.items) && Array.isArray(decoded.memos)) {
             loadInsightBoard(decoded);
+          } else {
+            window.alert('공유 링크를 불러오지 못했습니다.\n링크가 만료되었거나 잘못된 주소일 수 있습니다.');
           }
         })
-        .catch(() => { /* 실패 시 빈 바구니 유지 */ })
+        .catch(() => window.alert('공유 링크를 불러오지 못했습니다.\n네트워크 연결을 확인한 뒤 다시 열어 주세요.'))
         .finally(() => window.history.replaceState({}, '', window.location.pathname));
       return;
     }
@@ -72,8 +74,11 @@ function AppInner() {
     const gz = params.get('z');
     if (gz) {
       decodeBoardGzip(gz)
-        .then((decoded) => { if (isValidBoard(decoded)) loadInsightBoard(decoded); })
-        .catch(() => { /* 손상된 링크는 무시 */ })
+        .then((decoded) => {
+          if (isValidBoard(decoded)) loadInsightBoard(decoded);
+          else window.alert('공유 링크를 불러오지 못했습니다. 링크가 손상되었을 수 있습니다.');
+        })
+        .catch(() => window.alert('공유 링크를 불러오지 못했습니다. 링크가 손상되었을 수 있습니다.'))
         .finally(() => window.history.replaceState({}, '', window.location.pathname));
       return;
     }
@@ -131,12 +136,17 @@ function AppInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── 사용법 모달: Esc 키로 닫기 (접근성) ──
+  // ── 사용법 모달: Esc 키로 닫기 (접근성) + 배경 스크롤 잠금 ──
   useEffect(() => {
     if (!showHelp) return;
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setShowHelp(false); }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [showHelp]);
 
   // ── 네비게이션 핸들러 ──
@@ -213,9 +223,19 @@ function AppInner() {
       try {
         const data = JSON.parse(ev.target?.result as string) as InsightBoard;
         if (data && Array.isArray(data.items) && Array.isArray(data.memos)) {
+          // 불러오기는 현재 바구니를 통째로 교체하므로, 담긴 항목이 있으면 먼저 확인받는다.
+          const currentCount = state.insightBoard.items.length + state.insightBoard.memos.length;
+          if (currentCount > 0 && !window.confirm(
+            `현재 바구니에 담긴 ${currentCount}개 항목이 불러온 파일 내용으로 교체됩니다.\n계속하시겠습니까?`,
+          )) return;
           loadInsightBoard(data);
+          navigateTo('insight');  // 불러온 결과를 바로 확인할 수 있게 바구니로 이동
+        } else {
+          window.alert('인사이트 바구니 파일 형식이 아닙니다.\nJSON 저장으로 내려받은 파일인지 확인해 주세요.');
         }
-      } catch { /* invalid JSON */ }
+      } catch {
+        window.alert('파일을 읽지 못했습니다.\nJSON 저장으로 내려받은 인사이트 바구니 파일인지 확인해 주세요.');
+      }
     };
     reader.readAsText(file);
     e.target.value = '';
