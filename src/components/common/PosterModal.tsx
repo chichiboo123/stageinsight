@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 interface PosterModalProps {
   src: string;
@@ -56,19 +57,8 @@ export function PosterModal({ src, title, onClose }: PosterModalProps) {
   const [copyState, setCopyState] = useState<CopyState>('idle');
   const [dlState, setDlState] = useState<DownloadState>('idle');
 
-  // ESC 닫기
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
-
-  // 스크롤 잠금
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
+  // ESC 닫기 + 스크롤 잠금
+  useModalDismiss(onClose);
 
   const handleDownload = useCallback(async () => {
     setDlState('downloading');

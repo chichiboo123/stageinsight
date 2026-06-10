@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { usePerformances, usePerformanceDetail } from '../hooks/usePerformances';
 import { useDashboardCuration } from '../hooks/useDashboardCuration';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { ErrorMessage } from '../components/common/ErrorMessage';
 import { PosterModal } from '../components/common/PosterModal';
@@ -108,11 +109,7 @@ function SynopsisBox({ text }: { text: string }) {
 
 // ---------- 공연소개 이미지 모달 ----------
 function ImageModal({ images, title, onClose }: { images: string[]; title: string; onClose: () => void }) {
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
+  useModalDismiss(onClose);
 
   return (
     <div
@@ -161,11 +158,7 @@ function WikiModal({
   error: string | null;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
+  useModalDismiss(onClose);
 
   return (
     <div
@@ -240,11 +233,7 @@ function WikiModal({
 
 // ---------- 영화 상세 모달 ----------
 function MovieDetailModal({ movie, onClose }: { movie: Movie; onClose: () => void }) {
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
+  useModalDismiss(onClose);
 
   return (
     <div
@@ -314,11 +303,7 @@ function MovieDetailModal({ movie, onClose }: { movie: Movie; onClose: () => voi
 
 // ---------- 도서 상세 모달 ----------
 function BookDetailModal({ book, onClose }: { book: Book; onClose: () => void }) {
-  useEffect(() => {
-    const handle = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [onClose]);
+  useModalDismiss(onClose);
 
   return (
     <div
@@ -669,6 +654,16 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
     setWikiOpen(false); setWikiData(null); setWikiError(null); setWikiLoading(false);
   }, [selectedPerformance?.id]);
 
+  // 모바일(1열 레이아웃)에서는 공연 목록이 위, 상세가 아래에 쌓이므로
+  // 공연을 선택하면 상세 영역으로 자동 스크롤해 "선택했는데 변화가 없다"는 혼란을 막는다.
+  const dashboardRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!selectedPerformance?.id) return;
+    if (window.matchMedia('(max-width: 900px)').matches) {
+      dashboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedPerformance?.id]);
+
   const { performances, loading: perfLoading, error: perfError } = usePerformances(selectedVenue);
   const { performance: detailedPerformance, loading: detailLoading } = usePerformanceDetail(
     selectedPerformance?.id ?? null,
@@ -913,7 +908,7 @@ export function DashboardPage({ onGoToMap }: DashboardPageProps) {
         </aside>
 
         {/* 오른쪽: 융합 대시보드 */}
-        <main className={styles.dashboard}>
+        <main className={styles.dashboard} ref={dashboardRef}>
           {!selectedPerformance ? (
             <div className="empty-state" style={{ minHeight: '400px' }}>
               <span style={{ fontSize: '48px' }}>🖱️</span>
